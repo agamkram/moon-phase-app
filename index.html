@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#030408" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -84,11 +84,17 @@
       margin: 0 auto 1.5rem;
       aspect-ratio: 1;
       border-radius: 50%;
+      transform-origin: center center;
       box-shadow:
         0 0 16px rgba(255, 252, 245, 0.15),
         0 0 32px rgba(225, 236, 255, 0.32),
         0 0 64px rgba(195, 215, 255, 0.19),
         0 0 100px rgba(170, 195, 255, 0.08);
+    }
+
+    .moon-wrap.is-zoomed {
+      position: relative;
+      z-index: 5;
     }
 
     .moon-wrap.is-loading #moon { opacity: 0.4; }
@@ -737,6 +743,73 @@
     scheduleStarfield();
     window.addEventListener("resize", scheduleStarfield);
     window.addEventListener("orientationchange", scheduleStarfield);
+
+    const MIN_MOON_ZOOM = 1;
+    const MAX_MOON_ZOOM = 3;
+    let moonZoom = 1;
+    let pinchStartDist = 0;
+    let pinchStartZoom = 1;
+    let pinching = false;
+
+    function touchSpan(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    }
+
+    function applyMoonZoom() {
+      ui.wrap.style.transform = moonZoom === 1 ? "" : `scale(${moonZoom})`;
+      ui.wrap.classList.toggle("is-zoomed", moonZoom > 1.01);
+    }
+
+    document.addEventListener("touchstart", (event) => {
+      if (event.touches.length === 2) {
+        pinching = true;
+        pinchStartDist = touchSpan(event.touches);
+        pinchStartZoom = moonZoom;
+      }
+    }, { passive: true });
+
+    document.addEventListener("touchmove", (event) => {
+      if (!pinching || event.touches.length !== 2) return;
+      event.preventDefault();
+      const span = touchSpan(event.touches);
+      if (!pinchStartDist) return;
+      moonZoom = Math.min(MAX_MOON_ZOOM, Math.max(MIN_MOON_ZOOM, pinchStartZoom * (span / pinchStartDist)));
+      applyMoonZoom();
+    }, { passive: false });
+
+    document.addEventListener("touchend", (event) => {
+      if (event.touches.length < 2) {
+        pinching = false;
+        pinchStartDist = 0;
+      }
+    }, { passive: true });
+
+    let gestureStartZoom = 1;
+    document.addEventListener("gesturestart", (event) => {
+      event.preventDefault();
+      gestureStartZoom = moonZoom;
+    }, { passive: false });
+    document.addEventListener("gesturechange", (event) => {
+      event.preventDefault();
+      moonZoom = Math.min(MAX_MOON_ZOOM, Math.max(MIN_MOON_ZOOM, gestureStartZoom * event.scale));
+      applyMoonZoom();
+    }, { passive: false });
+    document.addEventListener("gestureend", (event) => {
+      event.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener("wheel", (event) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      moonZoom = Math.min(
+        MAX_MOON_ZOOM,
+        Math.max(MIN_MOON_ZOOM, moonZoom - event.deltaY * 0.012)
+      );
+      applyMoonZoom();
+    }, { passive: false });
+
     loadTexture();
   </script>
 </body>
