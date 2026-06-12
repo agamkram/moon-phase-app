@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#030408" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="preload" href="moon.jpg" as="image" type="image/jpeg" />
+  <link rel="preload" href="moon.jpg?v=4096e" as="image" type="image/jpeg" />
   <title>Today's Moon</title>
   <style>
     :root {
@@ -218,34 +218,49 @@
   <script>
     const SYNODIC = 29.530588853;
     const EARTHSHINE = 0.55;
-    const TEXTURE_FILTER = "brightness(1.35) contrast(1.38) saturate(1.22)";
+    const TEXTURE_FILTER = "none";
 
     const isPhone = /iPhone|iPod/i.test(navigator.userAgent) ||
       (navigator.userAgent.includes("Android") && window.innerWidth < 768);
 
-    function computeMoonSize() {
+    function moonCssSize() {
       const wrap = document.getElementById("moon-wrap");
-      const cssW = wrap
-        ? wrap.getBoundingClientRect().width
-        : Math.min(window.innerWidth * 0.78, 360);
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      if (isPhone) {
-        return Math.min(1024, Math.max(480, Math.round(cssW * dpr)));
-      }
-      return Math.min(1200, Math.max(800, Math.round(cssW * dpr)));
+      const cssW = wrap ? wrap.getBoundingClientRect().width : 0;
+      if (cssW > 0) return cssW;
+      return Math.min(window.innerWidth * 0.78, 360);
     }
 
-    let WORK_SIZE = computeMoonSize();
+    function computeMoonSize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      return Math.min(TEXTURE_SIZE, Math.max(256, Math.round(moonCssSize() * dpr)));
+    }
 
-    const MOON_SRC = "moon.jpg";
-    const TEXTURE_SIZE = 1536;
+    const MOON_SRC = "moon.jpg?v=4096e";
+    const TEXTURE_SIZE = 4096;
+    const MIN_MOON_ZOOM = 1;
+    const MAX_MOON_ZOOM = 3;
+    let moonZoom = 1;
+    let lastPhase = 0.5;
+    let lastIllum = 1;
+    let zoomRaf = 0;
+
+    function computeRenderSize() {
+      return Math.min(TEXTURE_SIZE, Math.max(256, Math.round(computeMoonSize() * moonZoom)));
+    }
+
+    function resizeRenderCanvas() {
+      const size = computeRenderSize();
+      if (canvas.width === size && canvas.height === size) return;
+      canvas.width = canvas.height = size;
+      limbGradient = null;
+      litLiftGradient = null;
+    }
 
     const starfield = document.getElementById("starfield");
     const canvas = document.getElementById("moon");
     const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
     const textureCanvas = document.getElementById("moon-texture");
     const textureCtx = textureCanvas.getContext("2d");
-    canvas.width = canvas.height = WORK_SIZE;
 
     const ui = {
       wrap: document.getElementById("moon-wrap"),
@@ -566,19 +581,31 @@
     function drawMoon(phase, illum) {
       if (!textureReady) return;
 
+      lastPhase = phase;
+      lastIllum = illum;
+
       const w = canvas.width;
+      const h = canvas.height;
+      if (!w || !h) return;
       const cx = w / 2;
-      const cy = w / 2;
-      const r = w / 2;
+      const cy = h / 2;
+      const r = Math.min(w, h) / 2;
       const side = textureCanvas.width;
 
-      ctx.clearRect(0, 0, w, w);
+      ctx.clearRect(0, 0, w, h);
 
       ctx.save();
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.clip();
-      ctx.drawImage(textureCanvas, 0, 0, side, side, cx - r, cy - r, r * 2, r * 2);
+      const dest = r * 2;
+      const downscale = dest < side - 2;
+      ctx.imageSmoothingEnabled = downscale;
+      if (downscale && "imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(textureCanvas, 0, 0, side, side, cx - r, cy - r, dest, dest);
+      ctx.imageSmoothingEnabled = true;
       ctx.restore();
 
       darkenUnlit(cx, cy, r, phase, illum, 1 - EARTHSHINE);
@@ -648,15 +675,22 @@
     }
 
     function bakeTexture(img) {
-      textureCanvas.width = textureCanvas.height = TEXTURE_SIZE;
-      textureCtx.imageSmoothingEnabled = true;
-      if ("imageSmoothingQuality" in textureCtx) {
+      const size = Math.min(TEXTURE_SIZE, img.naturalWidth, img.naturalHeight);
+      const sameSize = img.naturalWidth === size && img.naturalHeight === size;
+      textureCanvas.width = textureCanvas.height = size;
+      textureCtx.clearRect(0, 0, size, size);
+      textureCtx.filter = TEXTURE_FILTER;
+      textureCtx.imageSmoothingEnabled = !sameSize;
+      if (!sameSize && "imageSmoothingQuality" in textureCtx) {
         textureCtx.imageSmoothingQuality = "high";
       }
-      textureCtx.clearRect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-      textureCtx.filter = TEXTURE_FILTER;
-      textureCtx.drawImage(img, 0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+      if (sameSize) {
+        textureCtx.drawImage(img, 0, 0);
+      } else {
+        textureCtx.drawImage(img, 0, 0, size, size);
+      }
       textureCtx.filter = "none";
+      textureCtx.imageSmoothingEnabled = true;
       textureReady = true;
     }
 
@@ -684,10 +718,7 @@
         });
         if (img.decode) await img.decode();
         bakeTexture(img);
-        WORK_SIZE = computeMoonSize();
-        canvas.width = canvas.height = WORK_SIZE;
-        limbGradient = null;
-        litLiftGradient = null;
+        resizeRenderCanvas();
         ui.wrap.classList.remove("is-loading");
         setToday();
       } catch (error) {
@@ -740,13 +771,23 @@
       }, 100);
     }
 
-    scheduleStarfield();
-    window.addEventListener("resize", scheduleStarfield);
-    window.addEventListener("orientationchange", scheduleStarfield);
+    function scheduleMoonResize() {
+      requestAnimationFrame(() => {
+        resizeRenderCanvas();
+        if (textureReady) drawMoon(lastPhase, lastIllum);
+      });
+    }
 
-    const MIN_MOON_ZOOM = 1;
-    const MAX_MOON_ZOOM = 3;
-    let moonZoom = 1;
+    scheduleStarfield();
+    window.addEventListener("resize", () => {
+      scheduleStarfield();
+      scheduleMoonResize();
+    });
+    window.addEventListener("orientationchange", () => {
+      scheduleStarfield();
+      scheduleMoonResize();
+    });
+
     let pinchStartDist = 0;
     let pinchStartZoom = 1;
     let pinching = false;
@@ -760,6 +801,12 @@
     function applyMoonZoom() {
       ui.wrap.style.transform = moonZoom === 1 ? "" : `scale(${moonZoom})`;
       ui.wrap.classList.toggle("is-zoomed", moonZoom > 1.01);
+      if (zoomRaf) return;
+      zoomRaf = requestAnimationFrame(() => {
+        zoomRaf = 0;
+        resizeRenderCanvas();
+        if (textureReady) drawMoon(lastPhase, lastIllum);
+      });
     }
 
     document.addEventListener("touchstart", (event) => {
@@ -810,7 +857,16 @@
       applyMoonZoom();
     }, { passive: false });
 
-    loadTexture();
+    function boot() {
+      resizeRenderCanvas();
+      loadTexture();
+    }
+
+    if (document.readyState === "complete") {
+      requestAnimationFrame(boot);
+    } else {
+      window.addEventListener("load", () => requestAnimationFrame(boot), { once: true });
+    }
   </script>
 </body>
 </html>
