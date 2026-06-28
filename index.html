@@ -47,10 +47,13 @@
       border: 0;
       top: calc(-1 * env(safe-area-inset-top, 0px));
       left: calc(-1 * env(safe-area-inset-left, 0px));
-      width: calc(100% + env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
-      height: calc(100% + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
+      right: calc(-1 * env(safe-area-inset-right, 0px));
+      bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+      width: auto;
+      height: auto;
       min-width: 100vw;
       min-height: 100vh;
+      min-height: 100svh;
       min-height: 100dvh;
       min-height: 100lvh;
       min-height: -webkit-fill-available;
@@ -453,7 +456,7 @@
     const MAX_STARFIELD_CSS = 2400;
     let starfieldPaint = { w: 0, h: 0 };
     let safeAreaProbe = null;
-    let viewportProbe = null;
+    const viewportProbes = {};
 
     function isStandalone() {
       return window.navigator.standalone === true ||
@@ -476,17 +479,18 @@
       };
     }
 
-    function readViewportHeight() {
-      if (!viewportProbe) {
-        viewportProbe = document.createElement("div");
-        viewportProbe.style.cssText =
-          "position:fixed;top:0;left:0;height:100vh;height:100dvh;height:100lvh;height:-webkit-fill-available;visibility:hidden;pointer-events:none";
-        document.body.appendChild(viewportProbe);
+    function readViewportUnit(unit) {
+      if (!viewportProbes[unit]) {
+        const probe = document.createElement("div");
+        probe.style.cssText =
+          `position:fixed;top:0;left:0;height:100${unit};visibility:hidden;pointer-events:none`;
+        document.body.appendChild(probe);
+        viewportProbes[unit] = probe;
       }
-      return viewportProbe.getBoundingClientRect().height;
+      return viewportProbes[unit].getBoundingClientRect().height;
     }
 
-    function viewportCoverSize() {
+    function minimumCoverSize() {
       const safe = readSafeAreaInsets();
       const vv = window.visualViewport;
       const visualH = (vv?.height ?? 0) + (vv?.offsetTop ?? 0);
@@ -494,23 +498,41 @@
       const layoutH = Math.max(
         window.innerHeight,
         document.documentElement.clientHeight,
-        document.documentElement.offsetHeight,
-        readViewportHeight(),
+        readViewportUnit("vh"),
+        readViewportUnit("svh"),
+        readViewportUnit("dvh"),
+        readViewportUnit("lvh"),
         visualH,
-        isStandalone() ? window.screen.height : 0
+        isStandalone() ? Math.max(window.screen.height, window.screen.width) : 0
       );
       const layoutW = Math.max(window.innerWidth, visualW, document.documentElement.clientWidth);
-      const w = Math.ceil(layoutW + safe.left + safe.right + 2);
-      const h = Math.ceil(layoutH + safe.top + safe.bottom + 4);
-      return { w, h, safe };
+      return {
+        w: Math.ceil(layoutW + safe.left + safe.right + 2),
+        h: Math.ceil(layoutH + safe.top + safe.bottom + 12),
+        safe,
+      };
     }
 
     function layoutStarfield(canvas) {
-      const { w: coverW, h: coverH, safe } = viewportCoverSize();
-      canvas.style.top = `${-safe.top}px`;
-      canvas.style.left = `${-safe.left}px`;
-      canvas.style.width = `${coverW}px`;
-      canvas.style.height = `${coverH}px`;
+      canvas.style.width = "";
+      canvas.style.height = "";
+
+      const minimum = minimumCoverSize();
+      let rect = canvas.getBoundingClientRect();
+      let coverW = Math.ceil(rect.width);
+      let coverH = Math.ceil(rect.height);
+
+      if (coverW < minimum.w || coverH < minimum.h) {
+        canvas.style.top = `${-minimum.safe.top}px`;
+        canvas.style.left = `${-minimum.safe.left}px`;
+        canvas.style.right = `${-minimum.safe.right}px`;
+        canvas.style.bottom = `${-minimum.safe.bottom}px`;
+        canvas.style.width = `${minimum.w}px`;
+        canvas.style.height = `${minimum.h}px`;
+        rect = canvas.getBoundingClientRect();
+        coverW = Math.max(Math.ceil(rect.width), minimum.w);
+        coverH = Math.max(Math.ceil(rect.height), minimum.h);
+      }
 
       const w = Math.min(coverW, MAX_STARFIELD_CSS);
       const h = Math.min(coverH, MAX_STARFIELD_CSS);
