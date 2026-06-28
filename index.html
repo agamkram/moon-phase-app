@@ -45,6 +45,15 @@
       margin: 0;
       padding: 0;
       border: 0;
+      top: calc(-1 * env(safe-area-inset-top, 0px));
+      left: calc(-1 * env(safe-area-inset-left, 0px));
+      width: calc(100% + env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
+      height: calc(100% + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
+      min-width: 100vw;
+      min-height: 100vh;
+      min-height: 100dvh;
+      min-height: 100lvh;
+      min-height: -webkit-fill-available;
     }
 
     main {
@@ -442,14 +451,20 @@
     }
 
     const MAX_STARFIELD_CSS = 2400;
-    let starfieldSize = { w: 0, h: 0 };
+    let starfieldPaint = { w: 0, h: 0 };
     let safeAreaProbe = null;
+    let viewportProbe = null;
+
+    function isStandalone() {
+      return window.navigator.standalone === true ||
+        window.matchMedia("(display-mode: standalone)").matches;
+    }
 
     function readSafeAreaInsets() {
       if (!safeAreaProbe) {
         safeAreaProbe = document.createElement("div");
         safeAreaProbe.style.cssText =
-          "position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
+          "position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding:constant(safe-area-inset-top) constant(safe-area-inset-right) constant(safe-area-inset-bottom) constant(safe-area-inset-left);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
         document.body.appendChild(safeAreaProbe);
       }
       const style = getComputedStyle(safeAreaProbe);
@@ -461,15 +476,32 @@
       };
     }
 
+    function readViewportHeight() {
+      if (!viewportProbe) {
+        viewportProbe = document.createElement("div");
+        viewportProbe.style.cssText =
+          "position:fixed;top:0;left:0;height:100vh;height:100dvh;height:100lvh;height:-webkit-fill-available;visibility:hidden;pointer-events:none";
+        document.body.appendChild(viewportProbe);
+      }
+      return viewportProbe.getBoundingClientRect().height;
+    }
+
     function viewportCoverSize() {
       const safe = readSafeAreaInsets();
       const vv = window.visualViewport;
-      const w = Math.ceil(window.innerWidth + safe.left + safe.right);
-      const h = Math.ceil(Math.max(
+      const visualH = (vv?.height ?? 0) + (vv?.offsetTop ?? 0);
+      const visualW = vv?.width ?? 0;
+      const layoutH = Math.max(
         window.innerHeight,
         document.documentElement.clientHeight,
-        (vv?.height ?? 0) + (vv?.offsetTop ?? 0)
-      ) + safe.top + safe.bottom);
+        document.documentElement.offsetHeight,
+        readViewportHeight(),
+        visualH,
+        isStandalone() ? window.screen.height : 0
+      );
+      const layoutW = Math.max(window.innerWidth, visualW, document.documentElement.clientWidth);
+      const w = Math.ceil(layoutW + safe.left + safe.right + 2);
+      const h = Math.ceil(layoutH + safe.top + safe.bottom + 4);
       return { w, h, safe };
     }
 
@@ -484,10 +516,10 @@
       const h = Math.min(coverH, MAX_STARFIELD_CSS);
 
       if (!w || !h) return false;
-      if (w === starfieldSize.w && h === starfieldSize.h && canvas.width > 0) return true;
+      if (w === starfieldPaint.w && h === starfieldPaint.h && canvas.width > 0) return true;
 
       paintStarfield(canvas, w, h);
-      starfieldSize = { w, h };
+      starfieldPaint = { w, h };
       return true;
     }
 
@@ -829,6 +861,7 @@
     window.addEventListener("orientationchange", onViewportChange);
     window.visualViewport?.addEventListener("resize", onViewportChange);
     window.visualViewport?.addEventListener("scroll", onViewportChange);
+    window.addEventListener("pageshow", onViewportChange);
 
     let pinchStartDist = 0;
     let pinchStartZoom = 1;
