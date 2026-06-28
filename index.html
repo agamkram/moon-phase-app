@@ -159,6 +159,35 @@
       background: rgba(255, 255, 255, 0.12);
       border-color: rgba(255, 255, 255, 0.28);
     }
+
+    .live-btn {
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.82rem;
+      border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .live-btn.is-live {
+      background: transparent;
+      border-color: transparent;
+      color: var(--muted);
+    }
+
+    .live-btn.is-live:hover {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .live-btn.is-preview {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.28);
+      color: var(--text);
+    }
+
+    .live-btn.is-preview:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
   </style>
 </head>
 <body>
@@ -191,7 +220,7 @@
 
       <div class="row">
         <span id="slider-label" class="slider-label">Live phase</span>
-        <button type="button" id="reset">Use today</button>
+        <button type="button" id="reset" class="live-btn is-live">Live</button>
       </div>
     </div>
   </main>
@@ -634,12 +663,19 @@
       updateMoonUI(date, phase, illum);
     }
 
+    function updateLiveButton() {
+      ui.reset.textContent = previewMode ? "Use live" : "Live";
+      ui.reset.classList.toggle("is-preview", previewMode);
+      ui.reset.classList.toggle("is-live", !previewMode);
+    }
+
     function setToday() {
       const now = new Date();
       currentDate = now;
       previewMode = false;
       ui.slider.value = Math.round(moonData(now).phase * 1000);
       ui.sliderLabel.textContent = "Live phase";
+      updateLiveButton();
       render(now);
     }
 
@@ -725,6 +761,7 @@
       const date = dateFromPhaseOffset(sliderAnchorDate, sliderAnchorPhase, phase);
       currentDate = date;
       ui.sliderLabel.textContent = `Preview ${(phase * 100).toFixed(1)}% through cycle`;
+      updateLiveButton();
       queuePreview(phase, date);
     });
 
