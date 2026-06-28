@@ -281,6 +281,8 @@
     let sliderRaf = 0;
     let sliderDragging = false;
     let pendingPreviewPhase = null;
+    let sliderAnchorDate = null;
+    let sliderAnchorPhase = 0;
     let limbGradient = null;
     let litLiftGradient = null;
 
@@ -308,6 +310,25 @@
       return date.toLocaleDateString(undefined, {
         weekday: "long", year: "numeric", month: "long", day: "numeric",
       });
+    }
+
+    function toDateInputValue(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function phaseDelta(from, to) {
+      let d = to - from;
+      if (d > 0.5) d -= 1;
+      if (d < -0.5) d += 1;
+      return d;
+    }
+
+    function dateFromPhaseOffset(anchorDate, anchorPhase, targetPhase) {
+      const delta = phaseDelta(anchorPhase, targetPhase);
+      return new Date(anchorDate.getTime() + delta * SYNODIC * 86400000);
     }
 
     function cropRect(w, h) {
@@ -669,9 +690,17 @@
 
     function setToday() {
       const now = new Date();
-      ui.date.value = now.toISOString().slice(0, 10);
+      ui.date.value = toDateInputValue(now);
       syncSlider(now);
       render(now);
+    }
+
+    function updateSliderMeta(phase, date) {
+      const illum = phaseIllum(phase);
+      ui.phaseName.textContent = phaseName(phase);
+      ui.meta.innerHTML =
+        `${formatDate(date)}<br>` +
+        `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)}`;
     }
 
     function bakeTexture(img) {
@@ -736,24 +765,48 @@
     }
 
     ui.date.addEventListener("change", () => {
+      sliderAnchorDate = null;
       syncSlider(dateFromInput());
       render(dateFromInput());
     });
 
-    ui.slider.addEventListener("pointerdown", () => { sliderDragging = true; });
+    ui.slider.addEventListener("pointerdown", () => {
+      sliderDragging = true;
+      sliderAnchorDate = dateFromInput();
+      sliderAnchorPhase = moonData(sliderAnchorDate).phase;
+    });
     ui.slider.addEventListener("pointerup", () => {
       sliderDragging = false;
-      if (previewMode) updatePreviewStats(Number(ui.slider.value) / 1000);
+      if (previewMode) {
+        const phase = Number(ui.slider.value) / 1000;
+        const anchor = sliderAnchorDate || dateFromInput();
+        const anchorPhase = sliderAnchorDate ? sliderAnchorPhase : moonData(anchor).phase;
+        updateSliderMeta(phase, dateFromPhaseOffset(anchor, anchorPhase, phase));
+      }
+      sliderAnchorDate = null;
     });
     ui.slider.addEventListener("pointercancel", () => {
       sliderDragging = false;
-      if (previewMode) updatePreviewStats(Number(ui.slider.value) / 1000);
+      if (previewMode) {
+        const phase = Number(ui.slider.value) / 1000;
+        const anchor = sliderAnchorDate || dateFromInput();
+        const anchorPhase = sliderAnchorDate ? sliderAnchorPhase : moonData(anchor).phase;
+        updateSliderMeta(phase, dateFromPhaseOffset(anchor, anchorPhase, phase));
+      }
+      sliderAnchorDate = null;
     });
 
     ui.slider.addEventListener("input", () => {
+      if (!sliderAnchorDate) {
+        sliderAnchorDate = dateFromInput();
+        sliderAnchorPhase = moonData(sliderAnchorDate).phase;
+      }
       previewMode = true;
       const phase = Number(ui.slider.value) / 1000;
+      const date = dateFromPhaseOffset(sliderAnchorDate, sliderAnchorPhase, phase);
+      ui.date.value = toDateInputValue(date);
       ui.sliderLabel.textContent = `Preview ${(phase * 100).toFixed(1)}% through cycle`;
+      updateSliderMeta(phase, date);
       queuePreview(phase);
     });
 
