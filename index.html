@@ -26,10 +26,12 @@
     body {
       margin: 0;
       min-height: 100%;
+      min-height: 100dvh;
       min-height: 100lvh;
       min-height: -webkit-fill-available;
-      display: grid;
-      place-items: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       background: transparent;
       color: var(--text);
       font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
@@ -43,29 +45,17 @@
       margin: 0;
       padding: 0;
       border: 0;
-      top: calc(-1 * constant(safe-area-inset-top));
-      top: calc(-1 * env(safe-area-inset-top, 0px));
-      left: calc(-1 * constant(safe-area-inset-left));
-      left: calc(-1 * env(safe-area-inset-left, 0px));
-      width: calc(100% + constant(safe-area-inset-left) + constant(safe-area-inset-right));
-      width: calc(100% + env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px));
-      height: calc(100% + constant(safe-area-inset-top) + constant(safe-area-inset-bottom));
-      height: calc(100% + env(safe-area-inset-top, 0px) + env(safe-area-inset-bottom, 0px));
-      min-width: 100vw;
-      min-height: 100vh;
-      min-height: 100lvh;
-      min-height: -webkit-fill-available;
     }
 
     main {
       position: relative;
       z-index: 1;
-      width: min(92vw, 480px);
+      width: min(94vw, 480px);
       text-align: center;
       padding:
-        max(2rem, env(safe-area-inset-top))
+        max(1.25rem, env(safe-area-inset-top))
         max(1rem, env(safe-area-inset-right))
-        max(2.5rem, env(safe-area-inset-bottom))
+        max(1.25rem, env(safe-area-inset-bottom))
         max(1rem, env(safe-area-inset-left));
     }
 
@@ -187,6 +177,70 @@
 
     .live-btn.is-preview:hover {
       background: rgba(255, 255, 255, 0.16);
+    }
+
+    @media (min-width: 768px) {
+      main {
+        width: min(88vw, 560px);
+      }
+
+      .moon-wrap {
+        width: min(62vh, 78vw, 440px);
+      }
+
+      h1 { font-size: 1.85rem; }
+      .subtitle { margin-bottom: 1.25rem; }
+      .meta { margin-bottom: 1.25rem; }
+    }
+
+    @media (orientation: landscape) and (min-width: 768px) {
+      body {
+        align-items: stretch;
+      }
+
+      main {
+        width: min(92vw, 720px);
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+        grid-template-rows: auto auto 1fr;
+        column-gap: 1.75rem;
+        row-gap: 0.5rem;
+        text-align: left;
+        align-content: center;
+        min-height: 100dvh;
+        box-sizing: border-box;
+      }
+
+      main > h1,
+      main > .subtitle {
+        grid-column: 1 / -1;
+        text-align: center;
+      }
+
+      .subtitle { margin-bottom: 0.5rem; }
+
+      .moon-wrap {
+        grid-column: 1;
+        grid-row: 3;
+        width: min(72vh, 44vw, 420px);
+        margin: 0 auto;
+        align-self: center;
+      }
+
+      .phase-name,
+      .meta {
+        grid-column: 2;
+        text-align: left;
+      }
+
+      .phase-name { margin-top: 0.5rem; }
+      .meta { margin-bottom: 0.75rem; }
+
+      .controls {
+        grid-column: 2;
+        grid-row: 3;
+        align-self: center;
+      }
     }
   </style>
 </head>
@@ -423,32 +477,47 @@
       ctx.restore();
     }
 
-    function isStandalone() {
-      return window.navigator.standalone === true ||
-        window.matchMedia("(display-mode: standalone)").matches;
-    }
-
     const MAX_STARFIELD_CSS = 2400;
     let starfieldSize = { w: 0, h: 0 };
+    let safeAreaProbe = null;
+
+    function readSafeAreaInsets() {
+      if (!safeAreaProbe) {
+        safeAreaProbe = document.createElement("div");
+        safeAreaProbe.style.cssText =
+          "position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
+        document.body.appendChild(safeAreaProbe);
+      }
+      const style = getComputedStyle(safeAreaProbe);
+      return {
+        top: parseFloat(style.paddingTop) || 0,
+        right: parseFloat(style.paddingRight) || 0,
+        bottom: parseFloat(style.paddingBottom) || 0,
+        left: parseFloat(style.paddingLeft) || 0,
+      };
+    }
+
+    function viewportCoverSize() {
+      const safe = readSafeAreaInsets();
+      const vv = window.visualViewport;
+      const w = Math.ceil(window.innerWidth + safe.left + safe.right);
+      const h = Math.ceil(Math.max(
+        window.innerHeight,
+        document.documentElement.clientHeight,
+        (vv?.height ?? 0) + (vv?.offsetTop ?? 0)
+      ) + safe.top + safe.bottom);
+      return { w, h, safe };
+    }
 
     function layoutStarfield(canvas) {
-      let w;
-      let h;
+      const { w: coverW, h: coverH, safe } = viewportCoverSize();
+      canvas.style.top = `${-safe.top}px`;
+      canvas.style.left = `${-safe.left}px`;
+      canvas.style.width = `${coverW}px`;
+      canvas.style.height = `${coverH}px`;
 
-      if (isStandalone()) {
-        w = Math.ceil(window.innerWidth);
-        h = Math.ceil(window.screen.height);
-        canvas.style.top = "0";
-        canvas.style.left = "0";
-        canvas.style.width = `${w}px`;
-        canvas.style.height = `${h}px`;
-      } else {
-        w = Math.ceil(window.innerWidth);
-        h = Math.ceil(window.innerHeight);
-      }
-
-      w = Math.min(w, MAX_STARFIELD_CSS);
-      h = Math.min(h, MAX_STARFIELD_CSS);
+      const w = Math.min(coverW, MAX_STARFIELD_CSS);
+      const h = Math.min(coverH, MAX_STARFIELD_CSS);
 
       if (!w || !h) return false;
       if (w === starfieldSize.w && h === starfieldSize.h && canvas.width > 0) return true;
@@ -794,6 +863,8 @@
     scheduleStarfield();
     window.addEventListener("resize", onViewportChange);
     window.addEventListener("orientationchange", onViewportChange);
+    window.visualViewport?.addEventListener("resize", onViewportChange);
+    window.visualViewport?.addEventListener("scroll", onViewportChange);
 
     let pinchStartDist = 0;
     let pinchStartZoom = 1;
