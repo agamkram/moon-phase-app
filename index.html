@@ -11,7 +11,6 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #070b14;
       --text: #e8edf7;
       --muted: #8b95a8;
       --accent: #c8d4e8;
@@ -203,10 +202,6 @@
   <script>
     const SYNODIC = 29.530588853;
     const EARTHSHINE = 0.55;
-    const TEXTURE_FILTER = "none";
-
-    const isPhone = /iPhone|iPod/i.test(navigator.userAgent) ||
-      (navigator.userAgent.includes("Android") && window.innerWidth < 768);
 
     function moonCssSize() {
       const wrap = document.getElementById("moon-wrap");
@@ -263,7 +258,6 @@
     let previewMode = false;
     let northern = true;
     let sliderRaf = 0;
-    let sliderDragging = false;
     let pendingPreviewPhase = null;
     let currentDate = new Date();
     let sliderAnchorDate = null;
@@ -308,11 +302,6 @@
     function dateFromPhaseOffset(anchorDate, anchorPhase, targetPhase) {
       const delta = phaseDelta(anchorPhase, targetPhase);
       return new Date(anchorDate.getTime() + delta * SYNODIC * 86400000);
-    }
-
-    function cropRect(w, h) {
-      const side = Math.min(w, h);
-      return { sx: (w - side) / 2, sy: Math.max(0, (h - side) / 2), side };
     }
 
     function calcPhaseDisc(diameter, semiPhase) {
@@ -573,7 +562,8 @@
       }
 
       sf.fillStyle = "rgba(255, 255, 255, 0.012)";
-      for (let i = 0; i < 900; i++) {
+      const speckCount = Math.min(900, Math.floor(area / 2000));
+      for (let i = 0; i < speckCount; i++) {
         sf.fillRect(rand() * w, rand() * h, 1, 1);
       }
     }
@@ -625,17 +615,11 @@
       brightenLit(cx, cy, r, phase, illum);
     }
 
-    function updatePreviewStats(phase) {
-      const illum = phaseIllum(phase);
+    function updateMoonUI(date, phase, illum) {
       ui.phaseName.textContent = phaseName(phase);
-      ui.meta.textContent =
+      ui.meta.innerHTML =
+        `${formatDate(date)}<br>` +
         `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)}`;
-    }
-
-    function renderPreview(phase) {
-      if (!textureReady) return;
-      drawMoon(phase, phaseIllum(phase));
-      updatePreviewStats(phase);
     }
 
     function previewPhase() {
@@ -643,40 +627,29 @@
     }
 
     function render(date, phaseOverride = previewPhase()) {
-      if (!textureReady) return;
-
       const data = moonData(date);
       const phase = phaseOverride ?? data.phase;
       const illum = phaseOverride != null ? phaseIllum(phase) : data.fraction;
-
-      drawMoon(phase, illum);
-      ui.phaseName.textContent = phaseName(phase);
-      ui.meta.innerHTML =
-        `${formatDate(date)}<br>` +
-        `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)}`;
+      if (textureReady) drawMoon(phase, illum);
+      updateMoonUI(date, phase, illum);
     }
 
     function setToday() {
       const now = new Date();
       currentDate = now;
       previewMode = false;
-      const data = moonData(now);
-      ui.slider.value = Math.round(data.phase * 1000);
+      ui.slider.value = Math.round(moonData(now).phase * 1000);
       ui.sliderLabel.textContent = "Live phase";
-      if (!textureReady) return;
-      drawMoon(data.phase, data.fraction);
-      ui.phaseName.textContent = phaseName(data.phase);
-      ui.meta.innerHTML =
-        `${formatDate(now)}<br>` +
-        `${(data.fraction * 100).toFixed(1)}% illuminated · day ${(data.phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)}`;
+      render(now);
     }
 
-    function updateSliderMeta(phase, date) {
-      const illum = phaseIllum(phase);
-      ui.phaseName.textContent = phaseName(phase);
-      ui.meta.innerHTML =
-        `${formatDate(date)}<br>` +
-        `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)}`;
+    function ensureSliderAnchor() {
+      if (!sliderAnchorDate) {
+        sliderAnchorDate = currentDate;
+        sliderAnchorPhase = previewMode
+          ? Number(ui.slider.value) / 1000
+          : moonData(currentDate).phase;
+      }
     }
 
     function bakeTexture(img) {
@@ -684,7 +657,6 @@
       const sameSize = img.naturalWidth === size && img.naturalHeight === size;
       textureCanvas.width = textureCanvas.height = size;
       textureCtx.clearRect(0, 0, size, size);
-      textureCtx.filter = TEXTURE_FILTER;
       textureCtx.imageSmoothingEnabled = !sameSize;
       if (!sameSize && "imageSmoothingQuality" in textureCtx) {
         textureCtx.imageSmoothingQuality = "high";
@@ -694,7 +666,6 @@
       } else {
         textureCtx.drawImage(img, 0, 0, size, size);
       }
-      textureCtx.filter = "none";
       textureCtx.imageSmoothingEnabled = true;
       textureReady = true;
     }
@@ -711,8 +682,7 @@
         pendingPreviewPhase = null;
         pendingPreviewDate = null;
         drawMoon(previewPhase, phaseIllum(previewPhase));
-        if (previewDate) updateSliderMeta(previewPhase, previewDate);
-        else if (!sliderDragging) updatePreviewStats(previewPhase);
+        if (previewDate) updateMoonUI(previewDate, previewPhase, phaseIllum(previewPhase));
       });
     }
 
@@ -744,29 +714,12 @@
       if (textureReady) render(currentDate);
     }
 
-    ui.slider.addEventListener("pointerdown", () => {
-      sliderDragging = true;
-      sliderAnchorDate = currentDate;
-      sliderAnchorPhase = previewMode
-        ? Number(ui.slider.value) / 1000
-        : moonData(currentDate).phase;
-    });
-    ui.slider.addEventListener("pointerup", () => {
-      sliderDragging = false;
-      sliderAnchorDate = null;
-    });
-    ui.slider.addEventListener("pointercancel", () => {
-      sliderDragging = false;
-      sliderAnchorDate = null;
-    });
+    ui.slider.addEventListener("pointerdown", ensureSliderAnchor);
+    ui.slider.addEventListener("pointerup", () => { sliderAnchorDate = null; });
+    ui.slider.addEventListener("pointercancel", () => { sliderAnchorDate = null; });
 
     ui.slider.addEventListener("input", () => {
-      if (!sliderAnchorDate) {
-        sliderAnchorDate = currentDate;
-        sliderAnchorPhase = previewMode
-          ? Number(ui.slider.value) / 1000
-          : moonData(currentDate).phase;
-      }
+      ensureSliderAnchor();
       previewMode = true;
       const phase = Number(ui.slider.value) / 1000;
       const date = dateFromPhaseOffset(sliderAnchorDate, sliderAnchorPhase, phase);
@@ -796,15 +749,14 @@
       });
     }
 
+    function onViewportChange() {
+      scheduleStarfield();
+      scheduleMoonResize();
+    }
+
     scheduleStarfield();
-    window.addEventListener("resize", () => {
-      scheduleStarfield();
-      scheduleMoonResize();
-    });
-    window.addEventListener("orientationchange", () => {
-      scheduleStarfield();
-      scheduleMoonResize();
-    });
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("orientationchange", onViewportChange);
 
     let pinchStartDist = 0;
     let pinchStartZoom = 1;
