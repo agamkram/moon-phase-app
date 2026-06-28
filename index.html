@@ -191,7 +191,7 @@
       </label>
 
       <div class="row">
-        <span id="slider-label" class="slider-label">Live date</span>
+        <span id="slider-label" class="slider-label">Live phase</span>
         <button type="button" id="reset">Use today</button>
       </div>
     </div>
@@ -662,7 +662,7 @@
       previewMode = false;
       const data = moonData(now);
       ui.slider.value = Math.round(data.phase * 1000);
-      ui.sliderLabel.textContent = "Today";
+      ui.sliderLabel.textContent = "Live phase";
       if (!textureReady) return;
       drawMoon(data.phase, data.fraction);
       ui.phaseName.textContent = phaseName(data.phase);
@@ -771,7 +771,7 @@
       const phase = Number(ui.slider.value) / 1000;
       const date = dateFromPhaseOffset(sliderAnchorDate, sliderAnchorPhase, phase);
       currentDate = date;
-      ui.sliderLabel.textContent = formatDate(date);
+      ui.sliderLabel.textContent = `Preview ${(phase * 100).toFixed(1)}% through cycle`;
       queuePreview(phase, date);
     });
 
