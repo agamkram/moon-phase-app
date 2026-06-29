@@ -93,9 +93,12 @@
     }
 
     .moon-wrap.is-zoomed {
-      position: relative;
       z-index: 5;
       touch-action: none;
+    }
+
+    body.moon-zoomed {
+      overflow: visible;
     }
 
     .moon-wrap.is-loading #moon { opacity: 0.4; }
@@ -905,6 +908,7 @@
     let pinchStartGestureZoom = 1;
     let pinching = false;
     let gesturing = false;
+    let moonZoomOrigin = null;
 
     function touchSpan(touches) {
       const dx = touches[0].clientX - touches[1].clientX;
@@ -916,19 +920,40 @@
       return pinching || gesturing;
     }
 
-    function captureMoonBaseSize() {
-      if (moonZoom > 1.01 && moonBaseSize > 0) return;
-      if (moonZoom > 1.01 && ui.wrap.offsetWidth > 0) {
-        moonBaseSize = ui.wrap.offsetWidth / moonZoom;
-        return;
+    function layoutAnchorFromRect(rect) {
+      const vv = window.visualViewport;
+      return {
+        cx: rect.left + rect.width / 2 + (vv?.offsetLeft ?? 0),
+        cy: rect.top + rect.height / 2 + (vv?.offsetTop ?? 0),
+      };
+    }
+
+    function syncZoomAnchorFromView() {
+      if (!moonZoomOrigin) return;
+      Object.assign(moonZoomOrigin, layoutAnchorFromRect(ui.wrap.getBoundingClientRect()));
+    }
+
+    function captureMoonZoomOrigin() {
+      if (!(moonZoom > 1.01 && moonBaseSize > 0)) {
+        if (moonZoom > 1.01 && ui.wrap.offsetWidth > 0) {
+          moonBaseSize = ui.wrap.offsetWidth / moonZoom;
+        } else {
+          moonBaseSize = moonCssSize();
+        }
       }
-      moonBaseSize = moonCssSize();
+      moonZoomOrigin = layoutAnchorFromRect(ui.wrap.getBoundingClientRect());
     }
 
     function clearZoomLayout() {
+      moonZoomOrigin = null;
+      ui.wrap.style.position = "";
+      ui.wrap.style.left = "";
+      ui.wrap.style.top = "";
       ui.wrap.style.width = "";
       ui.wrap.style.height = "";
+      ui.wrap.style.margin = "";
       ui.wrap.style.transform = "";
+      document.body.classList.remove("moon-zoomed");
     }
 
     function repaintMoonNow(force = false) {
@@ -952,6 +977,7 @@
     function applyMoonZoom() {
       const zoomed = moonZoom > 1.01;
       ui.wrap.classList.toggle("is-zoomed", zoomed);
+      document.body.classList.toggle("moon-zoomed", zoomed);
 
       if (!zoomed) {
         moonBaseSize = 0;
@@ -960,20 +986,36 @@
         return;
       }
 
+      if (!moonZoomOrigin) captureMoonZoomOrigin();
+      if (!moonZoomOrigin) return;
+
+      const base = moonBaseSize;
+      const { cx, cy } = moonZoomOrigin;
+
       if (isLivePinch()) {
-        clearZoomLayout();
-        ui.wrap.style.transform = `scale(${moonZoom})`;
+        ui.wrap.style.position = "fixed";
+        ui.wrap.style.left = `${cx}px`;
+        ui.wrap.style.top = `${cy}px`;
+        ui.wrap.style.width = `${base}px`;
+        ui.wrap.style.height = `${base}px`;
+        ui.wrap.style.margin = "0";
+        ui.wrap.style.transform = `translate(-50%, -50%) scale(${moonZoom})`;
         return;
       }
 
-      const size = moonBaseSize * moonZoom;
+      const size = base * moonZoom;
+      ui.wrap.style.position = "fixed";
+      ui.wrap.style.left = `${cx}px`;
+      ui.wrap.style.top = `${cy}px`;
       ui.wrap.style.width = `${size}px`;
       ui.wrap.style.height = `${size}px`;
-      ui.wrap.style.transform = "";
+      ui.wrap.style.margin = "0";
+      ui.wrap.style.transform = "translate(-50%, -50%)";
       scheduleMoonRepaint();
     }
 
     function finishZoomGesture() {
+      syncZoomAnchorFromView();
       applyMoonZoom();
       repaintMoonNow(true);
       if (moonZoom > 1.01 && isTabletView()) {
@@ -986,7 +1028,7 @@
         pinching = true;
         pinchStartDist = touchSpan(event.touches);
         pinchStartZoom = moonZoom;
-        captureMoonBaseSize();
+        captureMoonZoomOrigin();
       }
     }, { passive: true });
 
@@ -1013,7 +1055,7 @@
       event.preventDefault();
       gesturing = true;
       pinchStartGestureZoom = moonZoom;
-      captureMoonBaseSize();
+      captureMoonZoomOrigin();
     }, { passive: false });
     document.addEventListener("gesturechange", (event) => {
       if (pinching) return;
@@ -1033,7 +1075,7 @@
     document.addEventListener("wheel", (event) => {
       if (!event.ctrlKey) return;
       event.preventDefault();
-      captureMoonBaseSize();
+      captureMoonZoomOrigin();
       moonZoom = Math.min(
         MAX_MOON_ZOOM,
         Math.max(MIN_MOON_ZOOM, moonZoom - event.deltaY * 0.012)
