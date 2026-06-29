@@ -414,7 +414,6 @@
   <script>
     const SYNODIC = 29.530588853;
     const EARTHSHINE = 0.55;
-    const RED_NIGHT_KEY = "redNight";
     const THEME_NORMAL = "#020308";
     const THEME_RED = "#140404";
     const MOON_TAP_SLOP = 12;
@@ -1430,17 +1429,10 @@
       document.documentElement.classList.toggle("red-night", on);
       const theme = document.querySelector('meta[name="theme-color"]');
       if (theme) theme.content = on ? THEME_RED : THEME_NORMAL;
-      try { localStorage.setItem(RED_NIGHT_KEY, on ? "1" : "0"); } catch (_) {}
       limbGradient = null;
       litLiftGradient = null;
       refreshStarfield();
       if (textureReady) drawMoon(lastPhase, lastIllum);
-    }
-
-    function loadRedNight() {
-      try {
-        if (localStorage.getItem(RED_NIGHT_KEY) === "1") setRedNight(true);
-      } catch (_) {}
     }
 
     function beginMoonTap(event) {
@@ -1502,7 +1494,6 @@
     });
 
     function boot() {
-      loadRedNight();
       resizeRenderCanvas();
       loadTexture();
     }
