@@ -21,6 +21,8 @@
     html {
       height: 100%;
       background: #020308;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     body {
@@ -83,6 +85,7 @@
       width: min(82vw, 400px);
       margin: 0 auto 1.5rem;
       aspect-ratio: 1;
+      flex-shrink: 0;
     }
 
     .moon-wrap {
@@ -90,6 +93,7 @@
       height: 100%;
       border-radius: 50%;
       transform-origin: center center;
+      touch-action: none;
       box-shadow:
         0 0 16px rgba(255, 252, 245, 0.15),
         0 0 32px rgba(225, 236, 255, 0.32),
@@ -103,7 +107,11 @@
     }
 
     body.moon-zoomed {
-      overflow: visible;
+      touch-action: none;
+    }
+
+    body.moon-zoomed main {
+      flex-shrink: 0;
     }
 
     .moon-wrap.is-loading #moon { opacity: 0.4; }
@@ -320,6 +328,8 @@
     const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
     const textureCanvas = document.getElementById("moon-texture");
     const textureCtx = textureCanvas.getContext("2d");
+
+    const mainEl = document.querySelector("main");
 
     const ui = {
       slot: document.querySelector(".moon-slot"),
@@ -894,9 +904,35 @@
       });
     }
 
+    let layoutFrozen = false;
+
+    function freezePageLayout() {
+      if (layoutFrozen || !mainEl) return;
+      layoutFrozen = true;
+      const w = mainEl.offsetWidth;
+      mainEl.style.width = `${w}px`;
+      mainEl.style.maxWidth = `${w}px`;
+      if (ui.slot?.offsetWidth > 0) {
+        ui.slot.style.width = `${ui.slot.offsetWidth}px`;
+        ui.slot.style.height = `${ui.slot.offsetHeight}px`;
+      }
+    }
+
+    function unfreezePageLayout() {
+      if (!layoutFrozen || !mainEl) return;
+      layoutFrozen = false;
+      mainEl.style.width = "";
+      mainEl.style.maxWidth = "";
+      if (ui.slot) {
+        ui.slot.style.width = "";
+        ui.slot.style.height = "";
+      }
+    }
+
     function onViewportChange() {
+      if (isLivePinch()) return;
       scheduleStarfield();
-      scheduleMoonResize();
+      if (!layoutFrozen) scheduleMoonResize();
     }
 
     function onOrientationChange() {
@@ -964,6 +1000,7 @@
       ui.wrap.style.margin = "";
       ui.wrap.style.transform = "";
       document.body.classList.remove("moon-zoomed");
+      unfreezePageLayout();
     }
 
     function repaintMoonNow(force = false) {
@@ -995,6 +1032,8 @@
         if (!isLivePinch()) scheduleMoonRepaint();
         return;
       }
+
+      freezePageLayout();
 
       if (!moonZoomOrigin) captureMoonZoomOrigin();
       if (!moonZoomOrigin) return;
@@ -1036,6 +1075,7 @@
     document.addEventListener("touchstart", (event) => {
       if (event.touches.length === 2) {
         pinching = true;
+        freezePageLayout();
         pinchStartDist = touchSpan(event.touches);
         pinchStartZoom = moonZoom;
         captureMoonZoomOrigin();
@@ -1056,7 +1096,10 @@
         const wasPinching = pinching;
         pinching = false;
         pinchStartDist = 0;
-        if (wasPinching) finishZoomGesture();
+        if (wasPinching) {
+          finishZoomGesture();
+          if (moonZoom <= 1.01) unfreezePageLayout();
+        }
       }
     }, { passive: true });
 
@@ -1064,6 +1107,7 @@
       if (pinching) return;
       event.preventDefault();
       gesturing = true;
+      freezePageLayout();
       pinchStartGestureZoom = moonZoom;
       captureMoonZoomOrigin();
     }, { passive: false });
@@ -1080,11 +1124,13 @@
       event.preventDefault();
       gesturing = false;
       finishZoomGesture();
+      if (moonZoom <= 1.01) unfreezePageLayout();
     }, { passive: false });
 
     document.addEventListener("wheel", (event) => {
       if (!event.ctrlKey) return;
       event.preventDefault();
+      freezePageLayout();
       captureMoonZoomOrigin();
       moonZoom = Math.min(
         MAX_MOON_ZOOM,
