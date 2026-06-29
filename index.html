@@ -414,6 +414,7 @@
   <script>
     const SYNODIC = 29.530588853;
     const EARTHSHINE = 0.55;
+    const RED_NIGHT_KEY = "redNight";
     const THEME_NORMAL = "#020308";
     const THEME_RED = "#140404";
     const MOON_TAP_SLOP = 12;
@@ -444,10 +445,8 @@
 
     function computeRenderSize() {
       const dpr = window.devicePixelRatio || 1;
-      if (sliderScrubbing && moonZoom > ZOOM_EPS && moonBaseSize > 0) {
-        return Math.min(TEXTURE_SIZE, Math.max(256, Math.ceil(moonBaseSize * dpr)));
-      }
-      return Math.min(TEXTURE_SIZE, Math.max(256, Math.ceil(moonCssSize() * dpr)));
+      const zoom = moonZoom > ZOOM_EPS ? moonZoom : 1;
+      return Math.min(TEXTURE_SIZE, Math.max(256, Math.ceil(moonCssSize() * dpr * zoom)));
     }
 
     function resizeRenderCanvas(force = false) {
@@ -484,7 +483,6 @@
     let previewMode = false;
     let northern = true;
     let sliderRaf = 0;
-    let sliderScrubbing = false;
     let pendingPreviewPhase = null;
     let currentDate = new Date();
     let sliderAnchorDate = null;
@@ -752,7 +750,7 @@
     }
 
     function applyAstronomerRed(ctx, w, h) {
-      if (!redNight || !w || !h || sliderScrubbing) return;
+      if (!redNight || !w || !h) return;
       const imageData = ctx.getImageData(0, 0, w, h);
       const d = imageData.data;
       for (let i = 0; i < d.length; i += 4) {
@@ -1057,17 +1055,9 @@
         const previewDate = pendingPreviewDate;
         pendingPreviewPhase = null;
         pendingPreviewDate = null;
-        if (sliderScrubbing && moonZoom > ZOOM_EPS) resizeRenderCanvas();
         drawMoon(previewPhase, phaseIllum(previewPhase));
         if (previewDate) updateMoonUI(previewDate, previewPhase, phaseIllum(previewPhase));
       });
-    }
-
-    function endSliderScrub() {
-      sliderAnchorDate = null;
-      if (!sliderScrubbing) return;
-      sliderScrubbing = false;
-      if (moonZoom > ZOOM_EPS) repaintMoonNow(true);
     }
 
     async function loadTexture() {
@@ -1098,12 +1088,9 @@
       if (textureReady) render(currentDate);
     }
 
-    ui.slider.addEventListener("pointerdown", () => {
-      ensureSliderAnchor();
-      sliderScrubbing = true;
-    });
-    ui.slider.addEventListener("pointerup", endSliderScrub);
-    ui.slider.addEventListener("pointercancel", endSliderScrub);
+    ui.slider.addEventListener("pointerdown", ensureSliderAnchor);
+    ui.slider.addEventListener("pointerup", () => { sliderAnchorDate = null; });
+    ui.slider.addEventListener("pointercancel", () => { sliderAnchorDate = null; });
 
     ui.slider.addEventListener("input", () => {
       ensureSliderAnchor();
@@ -1443,10 +1430,17 @@
       document.documentElement.classList.toggle("red-night", on);
       const theme = document.querySelector('meta[name="theme-color"]');
       if (theme) theme.content = on ? THEME_RED : THEME_NORMAL;
+      try { localStorage.setItem(RED_NIGHT_KEY, on ? "1" : "0"); } catch (_) {}
       limbGradient = null;
       litLiftGradient = null;
       refreshStarfield();
       if (textureReady) drawMoon(lastPhase, lastIllum);
+    }
+
+    function loadRedNight() {
+      try {
+        if (localStorage.getItem(RED_NIGHT_KEY) === "1") setRedNight(true);
+      } catch (_) {}
     }
 
     function beginMoonTap(event) {
@@ -1508,6 +1502,7 @@
     });
 
     function boot() {
+      loadRedNight();
       resizeRenderCanvas();
       loadTexture();
     }
