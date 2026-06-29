@@ -485,6 +485,7 @@
     }
 
     const MAX_STARFIELD_CSS = 4096;
+    const STARFIELD_BOOT_MS = [150, 600];
     let starfieldPaint = { w: 0, h: 0 };
     let safeAreaProbe = null;
     const viewportProbes = {};
@@ -555,7 +556,7 @@
 
       if (!w || !h) return false;
 
-      if (w > fallback.w || h > fallback.h) {
+      if (w > Math.ceil(rect.width) || h > Math.ceil(rect.height)) {
         sky.style.right = "auto";
         sky.style.bottom = "auto";
         sky.style.width = `${w}px`;
@@ -888,13 +889,21 @@
     ui.hemSouth.addEventListener("click", () => setHemisphere(false));
 
     let starfieldTimer = 0;
+    function runStarfieldLayout() {
+      requestAnimationFrame(() => {
+        if (!layoutStarfield(starfield)) starfieldTimer = setTimeout(runStarfieldLayout, 120);
+      });
+    }
+
     function scheduleStarfield() {
       clearTimeout(starfieldTimer);
-      starfieldTimer = setTimeout(() => {
-        requestAnimationFrame(() => {
-          if (!layoutStarfield(starfield)) setTimeout(scheduleStarfield, 120);
-        });
-      }, 100);
+      starfieldTimer = setTimeout(runStarfieldLayout, 100);
+    }
+
+    function refreshStarfield() {
+      resetStarfieldLayout();
+      STARFIELD_BOOT_MS.forEach((ms) => setTimeout(runStarfieldLayout, ms));
+      runStarfieldLayout();
     }
 
     function scheduleMoonResize() {
@@ -936,22 +945,25 @@
     }
 
     function onOrientationChange() {
-      resetStarfieldLayout();
+      refreshStarfield();
       if (moonZoom > ZOOM_EPS) {
         moonPan = { x: 0, y: 0 };
         moonHomeOrigin = null;
         [150, 350].forEach((ms) => setTimeout(() => applyMoonZoom(true), ms));
       }
-      onViewportChange();
+      if (!layoutFrozen) scheduleMoonResize();
       [150, 350, 600].forEach((ms) => setTimeout(onViewportChange, ms));
     }
 
-    scheduleStarfield();
+    refreshStarfield();
     window.addEventListener("resize", onViewportChange);
     window.addEventListener("orientationchange", onOrientationChange);
     window.visualViewport?.addEventListener("resize", onViewportChange);
     window.visualViewport?.addEventListener("scroll", onViewportChange);
-    window.addEventListener("pageshow", onViewportChange);
+    window.addEventListener("pageshow", () => {
+      refreshStarfield();
+      onViewportChange();
+    });
 
     let pinchStartDist = 0;
     let pinchStartZoom = 1;
