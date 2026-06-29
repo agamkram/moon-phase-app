@@ -373,7 +373,19 @@
 
     function moonData(date = new Date()) {
       const illum = Astronomy.Illumination(Astronomy.Body.Moon, date);
-      return { phase: Astronomy.MoonPhase(date) / 360, fraction: illum.phase_fraction };
+      return {
+        phase: Astronomy.MoonPhase(date) / 360,
+        fraction: illum.phase_fraction,
+        distanceKm: illum.geo_dist * Astronomy.KM_PER_AU,
+      };
+    }
+
+    function moonDistanceKm(date = new Date()) {
+      return Astronomy.Illumination(Astronomy.Body.Moon, date).geo_dist * Astronomy.KM_PER_AU;
+    }
+
+    function formatMoonDistance(km) {
+      return `${(km / 1000).toFixed(1)}k km`;
     }
 
     function phaseIllum(phase) {
@@ -771,7 +783,7 @@
       ui.phaseName.textContent = phaseName(phase);
       ui.meta.innerHTML =
         `${formatDate(date)}<br>` +
-        `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)}`;
+        `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)} · ${formatMoonDistance(moonDistanceKm(date))}`;
     }
 
     function previewPhase() {
