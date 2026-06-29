@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#020308" />
+  <script>
+    try { localStorage.removeItem("redNight"); } catch (e) {}
+    document.documentElement.classList.remove("red-night");
+  </script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="preload" href="moon.jpg?v=4096e" as="image" type="image/jpeg" />
@@ -1178,7 +1182,8 @@
     window.addEventListener("orientationchange", onOrientationChange);
     window.visualViewport?.addEventListener("resize", onViewportChange);
     window.visualViewport?.addEventListener("scroll", onViewportChange);
-    window.addEventListener("pageshow", () => {
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted) ensureNormalOnOpen();
       refreshStarfield();
       onViewportChange();
     });
@@ -1424,6 +1429,12 @@
       applyMoonZoom();
     }, { passive: false });
 
+    function ensureNormalOnOpen() {
+      try { localStorage.removeItem("redNight"); } catch (_) {}
+      if (!redNight && !document.documentElement.classList.contains("red-night")) return;
+      setRedNight(false);
+    }
+
     function setRedNight(on) {
       redNight = on;
       document.documentElement.classList.toggle("red-night", on);
@@ -1494,6 +1505,7 @@
     });
 
     function boot() {
+      ensureNormalOnOpen();
       resizeRenderCanvas();
       loadTexture();
     }
