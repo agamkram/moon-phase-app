@@ -79,10 +79,15 @@
 
     .subtitle { margin: 0 0 1.75rem; color: var(--muted); font-size: 0.95rem; }
 
-    .moon-wrap {
+    .moon-slot {
       width: min(82vw, 400px);
       margin: 0 auto 1.5rem;
       aspect-ratio: 1;
+    }
+
+    .moon-wrap {
+      width: 100%;
+      height: 100%;
       border-radius: 50%;
       transform-origin: center center;
       box-shadow:
@@ -199,7 +204,7 @@
         width: min(88vw, 560px);
       }
 
-      .moon-wrap {
+      .moon-slot {
         width: min(68vh, 82vw, 480px);
       }
 
@@ -213,7 +218,7 @@
         width: min(90vw, 520px);
       }
 
-      .moon-wrap {
+      .moon-slot {
         width: min(58vh, 68vw, 440px);
         margin-bottom: 1rem;
       }
@@ -232,8 +237,10 @@
     <h1>Today's Moon</h1>
     <p class="subtitle" id="subtitle">Northern Hemisphere</p>
 
-    <div class="moon-wrap is-loading" id="moon-wrap">
-      <canvas id="moon" aria-label="Moon phase rendering"></canvas>
+    <div class="moon-slot">
+      <div class="moon-wrap is-loading" id="moon-wrap">
+        <canvas id="moon" aria-label="Moon phase rendering"></canvas>
+      </div>
     </div>
 
     <p class="phase-name" id="phase-name">—</p>
@@ -278,8 +285,9 @@
         return moonBaseSize * moonZoom;
       }
       if (moonBaseSize > 0) return moonBaseSize;
-      const wrap = document.getElementById("moon-wrap");
-      if (wrap?.offsetWidth > 0) return wrap.offsetWidth;
+      const slot = ui.slot || document.querySelector(".moon-slot");
+      if (slot?.offsetWidth > 0) return slot.offsetWidth;
+      if (ui.wrap?.offsetWidth > 0) return ui.wrap.offsetWidth;
       return Math.min(window.innerWidth * 0.78, 360);
     }
 
@@ -314,6 +322,7 @@
     const textureCtx = textureCanvas.getContext("2d");
 
     const ui = {
+      slot: document.querySelector(".moon-slot"),
       wrap: document.getElementById("moon-wrap"),
       phaseName: document.getElementById("phase-name"),
       meta: document.getElementById("meta"),
@@ -935,8 +944,9 @@
 
     function captureMoonZoomOrigin() {
       if (!(moonZoom > 1.01 && moonBaseSize > 0)) {
-        if (moonZoom > 1.01 && ui.wrap.offsetWidth > 0) {
-          moonBaseSize = ui.wrap.offsetWidth / moonZoom;
+        const layoutW = ui.slot?.offsetWidth || ui.wrap.offsetWidth;
+        if (moonZoom > 1.01 && layoutW > 0) {
+          moonBaseSize = layoutW / moonZoom;
         } else {
           moonBaseSize = moonCssSize();
         }
