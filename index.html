@@ -303,60 +303,23 @@
       border-color: rgba(200, 120, 120, 0.32);
     }
 
-    body.red-night .moon-wrap {
+    body.red-night .red-surface {
       -webkit-filter: url(#astronomer-red);
       filter: url(#astronomer-red);
     }
 
+    .slider-panel {
+      padding: 0.85rem 0 0.35rem;
+    }
+
     #phase-slider {
-      -webkit-appearance: none;
-      appearance: none;
       display: block;
       width: 100%;
-      height: 44px;
+      min-height: 48px;
       margin: 0;
       cursor: pointer;
-      background: transparent;
+      accent-color: var(--accent);
       touch-action: pan-y;
-    }
-
-    #phase-slider::-webkit-slider-runnable-track {
-      height: 5px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.14);
-    }
-
-    #phase-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 18px;
-      height: 18px;
-      border: 13px solid transparent;
-      background: var(--accent);
-      background-clip: padding-box;
-      border-radius: 50%;
-      margin-top: -19.5px;
-    }
-
-    #phase-slider::-moz-range-track {
-      height: 5px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.14);
-      border: 0;
-    }
-
-    #phase-slider::-moz-range-thumb {
-      width: 18px;
-      height: 18px;
-      border: 13px solid transparent;
-      background: var(--accent);
-      background-clip: padding-box;
-      border-radius: 50%;
-      box-sizing: content-box;
-    }
-
-    body.red-night #phase-slider::-webkit-slider-runnable-track,
-    body.red-night #phase-slider::-moz-range-track {
-      background: rgba(200, 100, 100, 0.28);
     }
   </style>
 </head>
@@ -391,8 +354,10 @@
   </script>
 
   <main>
-    <h1>Today's Moon</h1>
-    <p class="subtitle" id="subtitle">Northern Hemisphere</p>
+    <div class="red-surface">
+      <h1>Today's Moon</h1>
+      <p class="subtitle" id="subtitle">Northern Hemisphere</p>
+    </div>
 
     <div class="moon-slot">
       <div class="moon-wrap is-loading" id="moon-wrap">
@@ -400,26 +365,32 @@
       </div>
     </div>
 
-    <p class="phase-name" id="phase-name">—</p>
-    <p class="meta" id="meta">—</p>
+    <div class="red-surface">
+      <p class="phase-name" id="phase-name">—</p>
+      <p class="meta" id="meta">—</p>
+    </div>
 
     <div class="controls">
-      <label>
-        Hemisphere
-        <div class="toggle-group">
-          <button type="button" id="hem-north" class="active">Northern</button>
-          <button type="button" id="hem-south">Southern</button>
+      <div class="red-surface">
+        <label>
+          Hemisphere
+          <div class="toggle-group">
+            <button type="button" id="hem-north" class="active">Northern</button>
+            <button type="button" id="hem-south">Southern</button>
+          </div>
+        </label>
+      </div>
+
+      <div class="slider-panel">
+        <label>
+          Preview phase
+          <input type="range" id="phase-slider" min="0" max="1000" value="0" step="1" />
+        </label>
+
+        <div class="row">
+          <span id="slider-label" class="slider-label">Live phase</span>
+          <button type="button" id="reset" class="live-btn is-live">Live</button>
         </div>
-      </label>
-
-      <label>
-        Preview phase
-        <input type="range" id="phase-slider" min="0" max="1000" value="0" step="1" />
-      </label>
-
-      <div class="row">
-        <span id="slider-label" class="slider-label">Live phase</span>
-        <button type="button" id="reset" class="live-btn is-live">Live</button>
       </div>
     </div>
   </main>
@@ -756,6 +727,20 @@
       starfieldRedPaint = null;
     }
 
+    function applyAstronomerRed(ctx, w, h) {
+      if (!redNight || !w || !h) return;
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const d = imageData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (!d[i + 3]) continue;
+        const lum = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+        d[i] = lum;
+        d[i + 1] = 0;
+        d[i + 2] = 0;
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+
     function paintStarfield(canvas, w, h) {
       const sf = canvas.getContext("2d");
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -966,6 +951,7 @@
       ctx.restore();
 
       brightenLit(cx, cy, r, phase, illum);
+      applyAstronomerRed(ctx, w, h);
     }
 
     function updateMoonUI(date, phase, illum) {
