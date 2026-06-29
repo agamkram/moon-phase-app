@@ -4,15 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#020308" />
-  <script>
-    try {
-      if (localStorage.getItem("redNight") === "1") {
-        document.documentElement.classList.add("red-night");
-        var theme = document.querySelector('meta[name="theme-color"]');
-        if (theme) theme.content = "#140404";
-      }
-    } catch (e) {}
-  </script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="preload" href="moon.jpg?v=4096e" as="image" type="image/jpeg" />
@@ -366,7 +357,6 @@
       var sky = document.getElementById("sky");
       var canvas = document.getElementById("starfield");
       if (!sky || !canvas) return;
-      if (localStorage.getItem("redNight") === "1") sky.style.background = "#140404";
       sky.style.right = "auto";
       sky.style.bottom = "auto";
       sky.style.width = cover;
