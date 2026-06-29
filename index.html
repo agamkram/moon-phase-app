@@ -140,6 +140,21 @@
     .phase-name { font-size: 1.35rem; margin: 0 0 0.35rem; }
     .meta { margin: 0 0 1.75rem; color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
 
+    .distance-toggle {
+      border: 0;
+      padding: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline dotted rgba(139, 149, 168, 0.45);
+      text-underline-offset: 0.15em;
+    }
+
+    .distance-toggle:hover {
+      color: var(--text);
+    }
+
     .controls {
       display: grid;
       gap: 0.85rem;
@@ -384,8 +399,32 @@
       return Astronomy.Illumination(Astronomy.Body.Moon, date).geo_dist * Astronomy.KM_PER_AU;
     }
 
-    function formatMoonDistance(km) {
-      return `${(km / 1000).toFixed(1)}k km`;
+    const KM_PER_MI = 0.62137119224;
+    let distanceUseKm = false;
+    let lastDistanceKm = 0;
+
+    function formatMoonDistance(km, useKm = distanceUseKm) {
+      const thousands = useKm ? km / 1000 : (km * KM_PER_MI) / 1000;
+      const unit = useKm ? 'k km' : 'k mi';
+      return `${thousands.toFixed(1)}${unit}`;
+    }
+
+    function bindDistanceToggle() {
+      const toggle = document.getElementById('moon-distance-toggle');
+      if (!toggle || toggle.dataset.bound) return;
+      toggle.dataset.bound = '1';
+      const flip = () => {
+        distanceUseKm = !distanceUseKm;
+        toggle.textContent = formatMoonDistance(lastDistanceKm);
+        toggle.setAttribute('aria-label', `Moon distance in ${distanceUseKm ? 'kilometers' : 'miles'}, tap to switch units`);
+      };
+      toggle.addEventListener('click', flip);
+      toggle.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          flip();
+        }
+      });
     }
 
     function phaseIllum(phase) {
@@ -781,9 +820,13 @@
 
     function updateMoonUI(date, phase, illum) {
       ui.phaseName.textContent = phaseName(phase);
+      lastDistanceKm = moonDistanceKm(date);
+      const distanceLabel = distanceUseKm ? 'kilometers' : 'miles';
       ui.meta.innerHTML =
         `${formatDate(date)}<br>` +
-        `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)} · ${formatMoonDistance(moonDistanceKm(date))}`;
+        `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)} · ` +
+        `<button type="button" class="distance-toggle" id="moon-distance-toggle" aria-label="Moon distance in ${distanceLabel}, tap to switch units">${formatMoonDistance(lastDistanceKm)}</button>`;
+      bindDistanceToggle();
     }
 
     function previewPhase() {
