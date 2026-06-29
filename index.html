@@ -197,8 +197,6 @@
       text-transform: uppercase;
     }
 
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
-
     .row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
     .slider-label { color: var(--muted); font-size: 0.85rem; }
 
@@ -289,10 +287,76 @@
       background: #140404;
     }
 
-    /* ~630 nm astronomer red for UI: luminance → red channel, brightness unchanged */
-    body.red-night main {
+    body.red-night .controls {
+      background: rgba(120, 40, 40, 0.08);
+      border-color: rgba(160, 60, 60, 0.18);
+    }
+
+    body.red-night button {
+      border-color: rgba(200, 120, 120, 0.22);
+      background: rgba(120, 40, 40, 0.12);
+    }
+
+    body.red-night .toggle-group button.active,
+    body.red-night .live-btn.is-preview {
+      background: rgba(160, 60, 60, 0.22);
+      border-color: rgba(200, 120, 120, 0.32);
+    }
+
+    body.red-night .moon-wrap {
       -webkit-filter: url(#astronomer-red);
       filter: url(#astronomer-red);
+    }
+
+    #phase-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      display: block;
+      width: 100%;
+      height: 44px;
+      margin: 0;
+      cursor: pointer;
+      background: transparent;
+      touch-action: pan-y;
+    }
+
+    #phase-slider::-webkit-slider-runnable-track {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    #phase-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border: 13px solid transparent;
+      background: var(--accent);
+      background-clip: padding-box;
+      border-radius: 50%;
+      margin-top: -19.5px;
+    }
+
+    #phase-slider::-moz-range-track {
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 0;
+    }
+
+    #phase-slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border: 13px solid transparent;
+      background: var(--accent);
+      background-clip: padding-box;
+      border-radius: 50%;
+      box-sizing: content-box;
+    }
+
+    body.red-night #phase-slider::-webkit-slider-runnable-track,
+    body.red-night #phase-slider::-moz-range-track {
+      background: rgba(200, 100, 100, 0.28);
     }
   </style>
 </head>
@@ -692,20 +756,6 @@
       starfieldRedPaint = null;
     }
 
-    function applyAstronomerRed(ctx, w, h) {
-      if (!redNight || !w || !h) return;
-      const imageData = ctx.getImageData(0, 0, w, h);
-      const d = imageData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        if (!d[i + 3]) continue;
-        const lum = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
-        d[i] = lum;
-        d[i + 1] = 0;
-        d[i + 2] = 0;
-      }
-      ctx.putImageData(imageData, 0, 0);
-    }
-
     function paintStarfield(canvas, w, h) {
       const sf = canvas.getContext("2d");
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -916,7 +966,6 @@
       ctx.restore();
 
       brightenLit(cx, cy, r, phase, illum);
-      applyAstronomerRed(ctx, w, h);
     }
 
     function updateMoonUI(date, phase, illum) {
