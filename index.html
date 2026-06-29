@@ -138,9 +138,31 @@
     }
 
     .phase-name { font-size: 1.35rem; margin: 0 0 0.35rem; }
-    .meta { margin: 0 0 1.75rem; color: var(--muted); font-size: 0.92rem; line-height: 1.5; }
+    .meta {
+      margin: 0 0 1.75rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+      display: grid;
+      gap: 0.2rem;
+    }
+
+    .meta-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.65rem;
+    }
+
+    .meta-date,
+    .meta-detail {
+      min-width: 0;
+      text-align: left;
+    }
 
     .distance-toggle {
+      flex-shrink: 0;
+      white-space: nowrap;
       border: 0;
       padding: 0;
       background: none;
@@ -823,9 +845,11 @@
       lastDistanceKm = moonDistanceKm(date);
       const distanceLabel = distanceUseKm ? 'kilometers' : 'miles';
       ui.meta.innerHTML =
-        `${formatDate(date)}<br>` +
-        `${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)} · ` +
-        `<button type="button" class="distance-toggle" id="moon-distance-toggle" aria-label="Moon distance in ${distanceLabel}, tap to switch units">${formatMoonDistance(lastDistanceKm)}</button>`;
+        `<span class="meta-top">` +
+          `<span class="meta-date">${formatDate(date)}</span>` +
+          `<button type="button" class="distance-toggle" id="moon-distance-toggle" aria-label="Moon distance in ${distanceLabel}, tap to switch units">${formatMoonDistance(lastDistanceKm)}</button>` +
+        `</span>` +
+        `<span class="meta-detail">${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)}</span>`;
       bindDistanceToggle();
     }
 
