@@ -20,6 +20,7 @@
 
     html {
       height: 100%;
+      min-height: 100lvh;
       background: #020308;
       -webkit-text-size-adjust: 100%;
       text-size-adjust: 100%;
@@ -244,6 +245,20 @@
   <div id="sky" aria-hidden="true">
     <canvas id="starfield"></canvas>
   </div>
+  <script>
+    (function () {
+      var cover = Math.max(screen.width, screen.height) + "px";
+      var sky = document.getElementById("sky");
+      var canvas = document.getElementById("starfield");
+      if (!sky || !canvas) return;
+      sky.style.right = "auto";
+      sky.style.bottom = "auto";
+      sky.style.width = cover;
+      sky.style.height = cover;
+      canvas.style.width = cover;
+      canvas.style.height = cover;
+    })();
+  </script>
 
   <main>
     <h1>Today's Moon</h1>
@@ -485,8 +500,8 @@
     }
 
     const MAX_STARFIELD_CSS = 4096;
-    const STARFIELD_BOOT_MS = [150, 600];
-    let starfieldPaint = { w: 0, h: 0 };
+    const STARFIELD_BOOT_MS = [150, 600, 1200];
+    let starfieldCover = 0;
     let safeAreaProbe = null;
     const viewportProbes = {};
 
@@ -517,64 +532,53 @@
       return viewportProbes[unit].getBoundingClientRect().height;
     }
 
-    function viewportCoverSize() {
+    function starfieldCoverSize() {
       const safe = readSafeAreaInsets();
       const vv = window.visualViewport;
-      const visualH = (vv?.height ?? 0) + (vv?.offsetTop ?? 0);
-      const visualW = vv?.width ?? window.innerWidth;
-      const layoutH = Math.max(
+      const edge = Math.max(
+        window.innerWidth,
         window.innerHeight,
+        vv?.width ?? 0,
+        (vv?.height ?? 0) + (vv?.offsetTop ?? 0),
+        document.documentElement.clientWidth,
         document.documentElement.clientHeight,
         readViewportUnit("vh"),
         readViewportUnit("svh"),
         readViewportUnit("dvh"),
         readViewportUnit("lvh"),
-        visualH
+        screen.width,
+        screen.height
       );
-      const layoutW = Math.max(window.innerWidth, visualW, document.documentElement.clientWidth);
+      const pad = Math.max(safe.left + safe.right, safe.top + safe.bottom);
       return {
-        w: Math.min(Math.ceil(layoutW + safe.left + safe.right), MAX_STARFIELD_CSS),
-        h: Math.min(Math.ceil(layoutH + safe.top + safe.bottom), MAX_STARFIELD_CSS),
+        cover: Math.min(Math.ceil(edge + pad), MAX_STARFIELD_CSS),
         safe,
       };
     }
 
     function layoutStarfield(canvas) {
-      const safe = readSafeAreaInsets();
-      const fallback = viewportCoverSize();
+      const { cover, safe } = starfieldCoverSize();
+      if (!cover) return false;
 
+      const size = Math.max(cover, starfieldCover);
       sky.style.top = `${-safe.top}px`;
       sky.style.left = `${-safe.left}px`;
-      sky.style.right = `${-safe.right}px`;
-      sky.style.bottom = `${-safe.bottom}px`;
-      sky.style.width = "";
-      sky.style.height = "";
+      sky.style.right = "auto";
+      sky.style.bottom = "auto";
+      sky.style.width = `${size}px`;
+      sky.style.height = `${size}px`;
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
 
-      const rect = sky.getBoundingClientRect();
-      let w = Math.max(Math.ceil(rect.width), fallback.w);
-      let h = Math.max(Math.ceil(rect.height), fallback.h);
+      if (size === starfieldCover && canvas.width > 0) return true;
 
-      if (!w || !h) return false;
-
-      if (w > Math.ceil(rect.width) || h > Math.ceil(rect.height)) {
-        sky.style.right = "auto";
-        sky.style.bottom = "auto";
-        sky.style.width = `${w}px`;
-        sky.style.height = `${h}px`;
-      }
-
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
-
-      if (w === starfieldPaint.w && h === starfieldPaint.h && canvas.width > 0) return true;
-
-      paintStarfield(canvas, w, h);
-      starfieldPaint = { w, h };
+      paintStarfield(canvas, size, size);
+      starfieldCover = size;
       return true;
     }
 
     function resetStarfieldLayout() {
-      starfieldPaint = { w: 0, h: 0 };
+      starfieldCover = 0;
     }
 
     function paintStarfield(canvas, w, h) {
