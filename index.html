@@ -114,6 +114,15 @@
     }
 
     @media (max-width: 767px) {
+      .fit-stage {
+        padding-top: max(0.5rem, env(safe-area-inset-top));
+      }
+
+      .app {
+        top: 0;
+        transform-origin: top center;
+      }
+
       main.app {
         padding: 1rem 0.75rem;
       }
@@ -1196,6 +1205,13 @@
       return isPhoneLayout(availW) ? availW : WIDE_APP_WIDTH;
     }
 
+    function fitTransform(scale, layout) {
+      if (layout === "phone") {
+        return `translate(-50%, 0) scale(${scale})`;
+      }
+      return `translate(-50%, -50%) scale(${scale})`;
+    }
+
     function fitToScreen(remasure = false) {
       if (document.body.classList.contains("moon-zoomed")) return;
       const app = document.getElementById("app");
@@ -1213,7 +1229,7 @@
 
       if (remasure || viewportChanged || layoutChanged || !fitNaturalH) {
         const prevTransform = app.style.transform;
-        app.style.transform = "translate(-50%, -50%) scale(1)";
+        app.style.transform = fitTransform(1, layout);
         fitNaturalH = app.offsetHeight;
         fitNaturalW = app.offsetWidth;
         app.style.transform = prevTransform;
@@ -1230,7 +1246,7 @@
         1
       );
 
-      app.style.transform = `translate(-50%, -50%) scale(${scale})`;
+      app.style.transform = fitTransform(scale, layout);
       app.classList.add("is-fitted");
     }
 
