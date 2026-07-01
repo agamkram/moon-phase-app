@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#020308" />
   <script>
-    try { localStorage.removeItem("redNight"); } catch (e) {}
     document.documentElement.classList.remove("red-night");
   </script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -1488,7 +1487,6 @@
     }, { passive: false });
 
     function ensureNormalOnOpen() {
-      try { localStorage.removeItem("redNight"); } catch (_) {}
       if (!redNight && !document.documentElement.classList.contains("red-night")) return;
       setRedNight(false);
     }
