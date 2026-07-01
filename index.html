@@ -1174,6 +1174,7 @@
     }
 
     function fitToScreen(remasure = false) {
+      if (document.body.classList.contains("moon-zoomed")) return;
       const app = document.getElementById("app");
       const stage = document.getElementById("fit-stage");
       if (!app || !stage) return;
@@ -1274,8 +1275,8 @@
     }
 
     function captureMoonHome() {
-      if (moonHomeOrigin || !ui.slot) return;
-      moonHomeOrigin = layoutAnchorFromRect(ui.slot.getBoundingClientRect());
+      if (moonHomeOrigin || !ui.wrap) return;
+      moonHomeOrigin = layoutAnchorFromRect(ui.wrap.getBoundingClientRect());
     }
 
     function moonPanLimit() {
@@ -1335,7 +1336,18 @@
       }
     }
 
+    function ensureMoonZoomPortal() {
+      if (!ui.wrap || ui.wrap.parentElement === document.body) return;
+      document.body.appendChild(ui.wrap);
+    }
+
+    function releaseMoonZoomPortal() {
+      if (!ui.wrap || !ui.slot || ui.wrap.parentElement === ui.slot) return;
+      ui.slot.appendChild(ui.wrap);
+    }
+
     function setWrapZoomLayout(cx, cy, size, transform) {
+      ensureMoonZoomPortal();
       ui.wrap.style.position = "fixed";
       ui.wrap.style.left = `${cx}px`;
       ui.wrap.style.top = `${cy}px`;
@@ -1358,6 +1370,7 @@
       ui.wrap.style.height = "";
       ui.wrap.style.margin = "";
       ui.wrap.style.transform = "";
+      releaseMoonZoomPortal();
       document.body.classList.remove("moon-zoomed");
       unfreezePageLayout();
     }
@@ -1421,6 +1434,7 @@
         stopPanning();
         pinching = true;
         freezePageLayout();
+        if (moonZoom <= ZOOM_EPS) moonHomeOrigin = null;
         pinchStartDist = touchSpan(event.touches);
         pinchStartZoom = moonZoom;
         captureMoonZoomOrigin();
@@ -1454,6 +1468,7 @@
       stopPanning();
       gesturing = true;
       freezePageLayout();
+      if (moonZoom <= ZOOM_EPS) moonHomeOrigin = null;
       pinchStartGestureZoom = moonZoom;
       captureMoonZoomOrigin();
     }, { passive: false });
