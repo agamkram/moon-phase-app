@@ -430,6 +430,7 @@
   <canvas id="moon-texture" aria-hidden="true"></canvas>
 
   <script src="astronomy.js"></script>
+  <script src="fit-to-screen.js"></script>
   <script>
     const SYNODIC = 29.530588853;
     const EARTHSHINE = 0.55;
@@ -1100,11 +1101,11 @@
         resizeRenderCanvas();
         ui.wrap.classList.remove("is-loading");
         setToday();
-        scheduleFitToScreen(true);
+        fit.scheduleFitToScreen(true);
       } catch (error) {
         ui.wrap.classList.remove("is-loading");
         ui.meta.textContent = `Could not load moon image: ${error.message}`;
-        scheduleFitToScreen(true);
+        fit.scheduleFitToScreen(true);
       }
     }
 
@@ -1179,80 +1180,27 @@
     }
 
     function restoreLayoutAfterZoom() {
-      fitNaturalH = 0;
-      fitNaturalW = 0;
+      fit.resetNaturalSize();
       scheduleMoonResize();
-      scheduleFitToScreen(true);
+      fit.scheduleFitToScreen(true);
       if (textureReady) render(currentDate);
     }
 
-    const PHONE_MAX_WIDTH = 767;
-    const WIDE_APP_WIDTH = 480;
-    let fitFrame = 0;
-    let fitNaturalH = 0;
-    let fitNaturalW = 0;
-    let fitAvailH = 0;
-    let fitAvailW = 0;
-    let fitLayout = "";
-
-    function isPhoneLayout(availW) {
-      return availW <= PHONE_MAX_WIDTH;
-    }
-
-    function appLayoutWidth(availW) {
-      return isPhoneLayout(availW) ? availW : WIDE_APP_WIDTH;
-    }
-
-    function fitToScreen(remasure = false) {
-      if (document.body.classList.contains("moon-zoomed")) return;
-      const app = document.getElementById("app");
-      const stage = document.getElementById("fit-stage");
-      if (!app || !stage) return;
-
-      const availH = stage.clientHeight;
-      const availW = stage.clientWidth;
-      const viewportChanged = availH !== fitAvailH || availW !== fitAvailW;
-      const layout = isPhoneLayout(availW) ? "phone" : "wide";
-      const layoutChanged = layout !== fitLayout;
-
-      app.style.width = `${appLayoutWidth(availW)}px`;
-      app.dataset.layout = layout;
-
-      if (remasure || viewportChanged || layoutChanged || !fitNaturalH) {
-        const prevTransform = app.style.transform;
-        app.style.transform = "scale(1)";
-        fitNaturalH = app.offsetHeight;
-        fitNaturalW = app.offsetWidth;
-        app.style.transform = prevTransform;
-        fitAvailH = availH;
-        fitAvailW = availW;
-        fitLayout = layout;
-      }
-
-      if (!fitNaturalH || !fitNaturalW) return;
-
-      const scale = Math.min(
-        availH / fitNaturalH,
-        availW / fitNaturalW,
-        1
-      );
-
-      app.style.transform = `scale(${scale})`;
-      app.classList.add("is-fitted");
-    }
-
-    function scheduleFitToScreen(remasure = false) {
-      cancelAnimationFrame(fitFrame);
-      fitFrame = requestAnimationFrame(() => {
-        requestAnimationFrame(() => fitToScreen(remasure));
-      });
-    }
+    const fit = FitToScreen.create({
+      wideAppWidth: 480,
+      shouldFit: () => {
+        if (document.body.classList.contains("moon-zoomed")) return false;
+        if (moonZoom > ZOOM_EPS) return false;
+        if (isLivePinch()) return false;
+        return true;
+      },
+    });
 
     function onViewportChange() {
       if (isLivePinch()) return;
       scheduleStarfield();
       if (!layoutFrozen) scheduleMoonResize();
-      if (moonZoom <= ZOOM_EPS) scheduleFitToScreen(true);
+      if (moonZoom <= ZOOM_EPS) fit.scheduleFitToScreen(true);
     }
 
     function onOrientationChange() {
@@ -1618,7 +1566,7 @@
       ensureNormalOnOpen();
       resizeRenderCanvas();
       loadTexture();
-      scheduleFitToScreen(true);
+      fit.bootLayout();
     }
 
     if (document.readyState === "complete") {
