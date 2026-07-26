@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#020308" />
+  <script>
+    document.documentElement.classList.remove("red-night");
+  </script>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Today's Moon" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="apple-touch-icon.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="preload" href="moon.jpg?v=4096e" as="image" type="image/jpeg" />
+  <title>Today's Moon</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --text: #e8edf7;
+      --muted: #8b95a8;
+      --accent: #c8d4e8;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      height: 100%;
+      max-height: 100dvh;
+      min-height: 100lvh;
+      overflow: hidden;
+      background: #020308;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #020308;
+      color: var(--text);
+      font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    }
+
+    .fit-stage {
+      position: fixed;
+      inset: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding:
+        max(0.35rem, env(safe-area-inset-top))
+        max(0.5rem, env(safe-area-inset-right))
+        max(0.35rem, env(safe-area-inset-bottom))
+        max(0.5rem, env(safe-area-inset-left));
+    }
+
+    .app {
+      position: relative;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      transform: scale(1);
+      transform-origin: center center;
+      will-change: transform;
+    }
+
+    .app:not(.is-fitted) {
+      visibility: hidden;
+    }
+
+    #sky {
+      position: fixed;
+      z-index: 0;
+      pointer-events: none;
+      margin: 0;
+      padding: 0;
+      background: #020308;
+      overflow: hidden;
+      top: calc(-1 * env(safe-area-inset-top, 0px));
+      left: calc(-1 * env(safe-area-inset-left, 0px));
+      right: calc(-1 * env(safe-area-inset-right, 0px));
+      bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+    }
+
+    #starfield {
+      display: block;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      vertical-align: top;
+    }
+
+    main.app {
+      z-index: 1;
+      text-align: center;
+      padding: 1.25rem 1rem;
+    }
+
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.65rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    .subtitle { margin: 0 0 1.75rem; color: var(--muted); font-size: 0.95rem; }
+
+    .moon-slot {
+      width: 400px;
+      max-width: 100%;
+      margin: 0 auto 1.5rem;
+      aspect-ratio: 1;
+      flex-shrink: 0;
+      overflow: visible;
+    }
+
+    @media (max-width: 767px) {
+      .fit-stage {
+        padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+      }
+
+      main.app {
+        padding: 1rem 0.75rem;
+      }
+
+      .moon-slot {
+        width: min(100%, 340px);
+        margin-bottom: 1rem;
+      }
+
+      .subtitle { margin-bottom: 1rem; }
+      .meta { margin-bottom: 1rem; }
+      .controls { padding: 0.85rem 0.95rem; }
+    }
+
+    .moon-wrap {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      transform-origin: center center;
+      touch-action: none;
+      cursor: pointer;
+      box-shadow:
+        0 0 16px rgba(255, 252, 245, 0.15),
+        0 0 32px rgba(225, 236, 255, 0.32),
+        0 0 64px rgba(195, 215, 255, 0.19),
+        0 0 100px rgba(170, 195, 255, 0.08);
+    }
+
+    .moon-wrap.is-zoomed {
+      z-index: 5;
+      cursor: grab;
+    }
+
+    .moon-wrap.is-zoomed.is-panning {
+      cursor: grabbing;
+    }
+
+    body.moon-zoomed {
+      touch-action: none;
+    }
+
+    body.moon-zoomed main {
+      flex-shrink: 0;
+    }
+
+    .moon-wrap.is-loading #moon { opacity: 0.4; }
+
+    #moon {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 50%;
+      transition: opacity 0.25s ease;
+    }
+
+    #moon-texture {
+      position: fixed;
+      left: -9999px;
+      width: 0;
+      height: 0;
+      visibility: hidden;
+    }
+
+    .phase-name { font-size: 1.35rem; margin: 0 0 0.35rem; }
+    .meta {
+      margin: 0 0 1.75rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+      display: grid;
+      gap: 0.2rem;
+    }
+
+    .meta-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.65rem;
+    }
+
+    .meta-date,
+    .meta-detail {
+      min-width: 0;
+      text-align: left;
+    }
+
+    .distance-toggle {
+      flex-shrink: 0;
+      white-space: nowrap;
+      border: 0;
+      padding: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      text-decoration: underline dotted rgba(139, 149, 168, 0.45);
+      text-underline-offset: 0.15em;
+    }
+
+    .distance-toggle:hover {
+      color: var(--text);
+    }
+
+    .controls {
+      display: grid;
+      gap: 0.85rem;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 14px;
+      padding: 1rem 1.1rem;
+    }
+
+    label {
+      display: grid;
+      gap: 0.45rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+    }
+
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+    .slider-label { color: var(--muted); font-size: 0.85rem; }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 0.45rem 0.8rem;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover { background: rgba(255, 255, 255, 0.09); }
+
+    .toggle-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+    .toggle-group button.active {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.28);
+    }
+
+    .live-btn {
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.82rem;
+      border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+
+    .live-btn.is-live {
+      background: transparent;
+      border-color: transparent;
+      color: var(--muted);
+    }
+
+    .live-btn.is-live:hover {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .live-btn.is-preview {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.28);
+      color: var(--text);
+    }
+
+    .live-btn.is-preview:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    html.red-night {
+      background: #140404;
+      --text: #f2d0d0;
+      --muted: #b08080;
+      --accent: #e8b8b8;
+    }
+
+    html.red-night body {
+      background: #140404;
+    }
+
+    html.red-night #sky {
+      background: #140404;
+    }
+
+    html.red-night .controls {
+      background: rgba(120, 40, 40, 0.08);
+      border-color: rgba(160, 60, 60, 0.18);
+    }
+
+    html.red-night button {
+      border-color: rgba(200, 120, 120, 0.22);
+      background: rgba(120, 40, 40, 0.12);
+    }
+
+    html.red-night .toggle-group button.active,
+    html.red-night .live-btn.is-preview {
+      background: rgba(160, 60, 60, 0.22);
+      border-color: rgba(200, 120, 120, 0.32);
+    }
+
+    html.red-night .moon-wrap {
+      box-shadow:
+        0 0 16px rgba(255, 160, 140, 0.15),
+        0 0 32px rgba(255, 130, 110, 0.28),
+        0 0 64px rgba(220, 100, 90, 0.17),
+        0 0 100px rgba(200, 80, 70, 0.08);
+    }
+
+    html.red-night .red-surface,
+    html.red-night .slider-panel {
+      -webkit-filter: url(#astronomer-red);
+      filter: url(#astronomer-red);
+    }
+
+    .slider-panel {
+      padding: 0.85rem 0 0.35rem;
+    }
+
+    #phase-slider {
+      display: block;
+      width: 100%;
+      min-height: 48px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: var(--accent);
+      touch-action: pan-y;
+    }
+  </style>
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:fixed;width:0;height:0;pointer-events:none">
+    <defs>
+      <filter id="astronomer-red" color-interpolation-filters="sRGB">
+        <feColorMatrix in="SourceGraphic" type="matrix" values="
+          0.2126 0.7152 0.0722 0 0
+          0 0 0 0 0
+          0 0 0 0 0
+          0 0 0 1 0" />
+      </filter>
+    </defs>
+  </svg>
+  <div id="sky" aria-hidden="true">
+    <canvas id="starfield"></canvas>
+  </div>
+  <script>
+    (function () {
+      var cover = Math.max(screen.width, screen.height) + "px";
+      var sky = document.getElementById("sky");
+      var canvas = document.getElementById("starfield");
+      if (!sky || !canvas) return;
+      sky.style.right = "auto";
+      sky.style.bottom = "auto";
+      sky.style.width = cover;
+      sky.style.height = cover;
+      canvas.style.width = cover;
+      canvas.style.height = cover;
+    })();
+  </script>
+
+  <div class="fit-stage" id="fit-stage">
+  <main class="app" id="app">
+    <div class="red-surface">
+      <h1>Today's Moon</h1>
+      <p class="subtitle" id="subtitle">Northern Hemisphere</p>
+    </div>
+
+    <div class="moon-slot">
+      <div class="moon-wrap is-loading" id="moon-wrap">
+        <canvas id="moon" aria-label="Moon phase rendering. Tap to toggle astronomer red night mode."></canvas>
+      </div>
+    </div>
+
+    <div class="red-surface">
+      <p class="phase-name" id="phase-name">—</p>
+      <p class="meta" id="meta">—</p>
+    </div>
+
+    <div class="controls">
+      <div class="red-surface">
+        <label>
+          Hemisphere
+          <div class="toggle-group">
+            <button type="button" id="hem-north" class="active">Northern</button>
+            <button type="button" id="hem-south">Southern</button>
+          </div>
+        </label>
+      </div>
+
+      <div class="slider-panel">
+        <label>
+          Preview phase
+          <input type="range" id="phase-slider" min="0" max="1000" value="0" step="1" />
+        </label>
+
+        <div class="row">
+          <span id="slider-label" class="slider-label">Live phase</span>
+          <button type="button" id="reset" class="live-btn is-live">Live</button>
+        </div>
+      </div>
+    </div>
+  </main>
+  </div>
+
+  <canvas id="moon-texture" aria-hidden="true"></canvas>
+
+  <script src="astronomy.js"></script>
+  <script src="fit-to-screen.js"></script>
+  <script>
+    const SYNODIC = 29.530588853;
+    const EARTHSHINE = 0.55;
+    const THEME_NORMAL = "#020308";
+    const THEME_RED = "#140404";
+    const MOON_TAP_SLOP = 12;
+    let redNight = false;
+    let moonTap = null;
+
+    let moonBaseSize = 0;
+
+    const MOON_SRC = "moon.jpg?v=4096e";
+    const TEXTURE_SIZE = 4096;
+    const MIN_MOON_ZOOM = 1;
+    const MAX_MOON_ZOOM = 3;
+    const ZOOM_EPS = 1.01;
+
+    function readAppFitScale() {
+      const app = document.getElementById("app");
+      if (!app) return 1;
+      const transform = getComputedStyle(app).transform;
+      if (!transform || transform === "none") return 1;
+      const scale = new DOMMatrix(transform).a;
+      return scale > 0 ? scale : 1;
+    }
+
+    function moonCssSize() {
+      if (moonBaseSize > 0 && moonZoom > ZOOM_EPS) {
+        return moonBaseSize * moonZoom * readAppFitScale();
+      }
+      if (moonBaseSize > 0) return moonBaseSize;
+      if (ui.slot?.offsetWidth > 0) return ui.slot.offsetWidth;
+      if (ui.wrap?.offsetWidth > 0) return ui.wrap.offsetWidth;
+      return Math.min(window.innerWidth * 0.78, 400);
+    }
+    let moonZoom = 1;
+    let lastPhase = 0.5;
+    let lastIllum = 1;
+    let zoomRaf = 0;
+
+    function computeRenderSize() {
+      const dpr = window.devicePixelRatio || 1;
+      return Math.min(TEXTURE_SIZE, Math.max(256, Math.ceil(moonCssSize() * dpr)));
+    }
+
+    function resizeRenderCanvas(force = false) {
+      const size = computeRenderSize();
+      if (!force && canvas.width === size && canvas.height === size) return;
+      canvas.width = canvas.height = size;
+      limbGradient = null;
+      litLiftGradient = null;
+    }
+
+    const sky = document.getElementById("sky");
+    const starfield = document.getElementById("starfield");
+    const canvas = document.getElementById("moon");
+    const ctx = canvas.getContext("2d", { alpha: true, desynchronized: true });
+    const textureCanvas = document.getElementById("moon-texture");
+    const textureCtx = textureCanvas.getContext("2d");
+
+
+
+    const ui = {
+      slot: document.querySelector(".moon-slot"),
+      wrap: document.getElementById("moon-wrap"),
+      phaseName: document.getElementById("phase-name"),
+      meta: document.getElementById("meta"),
+      subtitle: document.getElementById("subtitle"),
+      slider: document.getElementById("phase-slider"),
+      sliderLabel: document.getElementById("slider-label"),
+      hemNorth: document.getElementById("hem-north"),
+      hemSouth: document.getElementById("hem-south"),
+      reset: document.getElementById("reset"),
+    };
+
+    let textureReady = false;
+    let previewMode = false;
+    let northern = true;
+    let sliderRaf = 0;
+    let pendingPreviewPhase = null;
+    let currentDate = new Date();
+    let sliderAnchorDate = null;
+    let sliderAnchorPhase = 0;
+    let pendingPreviewDate = null;
+    let limbGradient = null;
+    let litLiftGradient = null;
+
+    function moonData(date = new Date()) {
+      const illum = Astronomy.Illumination(Astronomy.Body.Moon, date);
+      return {
+        phase: Astronomy.MoonPhase(date) / 360,
+        fraction: illum.phase_fraction,
+        distanceKm: illum.geo_dist * Astronomy.KM_PER_AU,
+      };
+    }
+
+    function moonDistanceKm(date = new Date()) {
+      return Astronomy.Illumination(Astronomy.Body.Moon, date).geo_dist * Astronomy.KM_PER_AU;
+    }
+
+    const KM_PER_MI = 0.62137119224;
+    let distanceUseKm = false;
+    let lastDistanceKm = 0;
+
+    function formatMoonDistance(km, useKm = distanceUseKm) {
+      const thousands = useKm ? km / 1000 : (km * KM_PER_MI) / 1000;
+      const unit = useKm ? 'k km' : 'k mi';
+      return `${thousands.toFixed(1)}${unit}`;
+    }
+
+    function bindDistanceToggle() {
+      const toggle = document.getElementById('moon-distance-toggle');
+      if (!toggle || toggle.dataset.bound) return;
+      toggle.dataset.bound = '1';
+      const flip = () => {
+        distanceUseKm = !distanceUseKm;
+        toggle.textContent = formatMoonDistance(lastDistanceKm);
+        toggle.setAttribute('aria-label', `Moon distance in ${distanceUseKm ? 'kilometers' : 'miles'}, tap to switch units`);
+      };
+      toggle.addEventListener('click', flip);
+      toggle.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          flip();
+        }
+      });
+    }
+
+    function phaseIllum(phase) {
+      return (1 - Math.cos(phase * Math.PI * 2)) / 2;
+    }
+
+    function phaseName(phase) {
+      if (phase < 0.03 || phase > 0.97) return "New Moon";
+      if (phase < 0.22) return "Waxing Crescent";
+      if (phase < 0.28) return "First Quarter";
+      if (phase < 0.47) return "Waxing Gibbous";
+      if (phase < 0.53) return "Full Moon";
+      if (phase < 0.72) return "Waning Gibbous";
+      if (phase < 0.78) return "Last Quarter";
+      return "Waning Crescent";
+    }
+
+    function formatDate(date) {
+      return date.toLocaleDateString(undefined, {
+        weekday: "long", year: "numeric", month: "long", day: "numeric",
+      });
+    }
+
+    function phaseDelta(from, to) {
+      let d = to - from;
+      if (d > 0.5) d -= 1;
+      if (d < -0.5) d += 1;
+      return d;
+    }
+
+    function dateFromPhaseOffset(anchorDate, anchorPhase, targetPhase) {
+      const delta = phaseDelta(anchorPhase, targetPhase);
+      return new Date(anchorDate.getTime() + delta * SYNODIC * 86400000);
+    }
+
+    function calcPhaseDisc(diameter, semiPhase) {
+      const absPhase = Math.abs(semiPhase);
+      const n = ((1 - absPhase) * diameter / 2) || 0.01;
+      const discR = n / 2 + (diameter * diameter) / (8 * n);
+      const left = semiPhase > 0 ? (diameter / 2 - n) : (-2 * discR + diameter / 2 + n);
+      return { x: left + discR, r: discR };
+    }
+
+    function appendUnlitPath(context, cx, cy, r, phase, illum) {
+      const waxing = phase <= 0.5;
+      const d = r * 2;
+
+      if (Math.abs(illum - 0.5) < 0.002) {
+        context.moveTo(cx, cy - r);
+        context.arc(cx, cy, r, waxing ? -Math.PI / 2 : Math.PI / 2, waxing ? Math.PI / 2 : -Math.PI / 2, true);
+        context.closePath();
+        return;
+      }
+
+      let semi = illum < 0.5 ? illum * 2 : (1 - illum) * 2;
+      if (illum < 0.5 ? waxing : !waxing) semi *= -1;
+      const disc = calcPhaseDisc(d, semi);
+
+      if (illum >= 0.5) context.arc(cx, cy, r, 0, Math.PI * 2);
+      context.arc(cx - r + disc.x, cy, disc.r, 0, Math.PI * 2, illum >= 0.5);
+    }
+
+    function fillUnlitRegion(context, cx, cy, r, phase, illum) {
+      context.beginPath();
+      if (!northern) {
+        context.save();
+        context.translate(cx, 0);
+        context.scale(-1, 1);
+        context.translate(-cx, 0);
+        appendUnlitPath(context, cx, cy, r, phase, illum);
+        context.restore();
+      } else {
+        appendUnlitPath(context, cx, cy, r, phase, illum);
+      }
+      context.fill();
+    }
+
+    function darkenUnlit(cx, cy, r, phase, illum, amount) {
+      if (amount <= 0) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.fillStyle = `rgba(0, 0, 0, ${amount})`;
+      if (illum <= 0.005) {
+        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      } else if (illum < 0.995) {
+        fillUnlitRegion(ctx, cx, cy, r, phase, illum);
+      }
+      ctx.restore();
+    }
+
+    function brightenLit(cx, cy, r, phase, illum) {
+      if (illum <= 0.005) return;
+
+      let lift;
+      if (redNight) {
+        lift = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.92);
+        lift.addColorStop(0, "rgba(255, 140, 120, 0.2)");
+        lift.addColorStop(0.55, "rgba(255, 120, 100, 0.07)");
+        lift.addColorStop(1, "rgba(255, 100, 80, 0)");
+      } else {
+        if (!litLiftGradient) {
+          litLiftGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.92);
+          litLiftGradient.addColorStop(0, "rgba(255, 248, 235, 0.2)");
+          litLiftGradient.addColorStop(0.55, "rgba(255, 248, 235, 0.07)");
+          litLiftGradient.addColorStop(1, "rgba(255, 248, 235, 0)");
+        }
+        lift = litLiftGradient;
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      if (illum < 0.995) {
+        if (!northern) {
+          ctx.save();
+          ctx.translate(cx, 0);
+          ctx.scale(-1, 1);
+          ctx.translate(-cx, 0);
+          appendUnlitPath(ctx, cx, cy, r, phase, illum);
+          ctx.restore();
+        } else {
+          appendUnlitPath(ctx, cx, cy, r, phase, illum);
+        }
+      }
+      ctx.clip("evenodd");
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.fillStyle = lift;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      ctx.restore();
+    }
+
+    const MAX_STARFIELD_CSS = 4096;
+    const STARFIELD_BOOT_MS = [150, 600, 1200];
+    let starfieldCover = 0;
+    let starfieldRedPaint = null;
+    let safeAreaProbe = null;
+    const viewportProbes = {};
+
+    function readSafeAreaInsets() {
+      if (!safeAreaProbe) {
+        safeAreaProbe = document.createElement("div");
+        safeAreaProbe.style.cssText =
+          "position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding:constant(safe-area-inset-top) constant(safe-area-inset-right) constant(safe-area-inset-bottom) constant(safe-area-inset-left);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
+        document.body.appendChild(safeAreaProbe);
+      }
+      const style = getComputedStyle(safeAreaProbe);
+      return {
+        top: parseFloat(style.paddingTop) || 0,
+        right: parseFloat(style.paddingRight) || 0,
+        bottom: parseFloat(style.paddingBottom) || 0,
+        left: parseFloat(style.paddingLeft) || 0,
+      };
+    }
+
+    function readViewportUnit(unit) {
+      if (!viewportProbes[unit]) {
+        const probe = document.createElement("div");
+        probe.style.cssText =
+          `position:fixed;top:0;left:0;height:100${unit};visibility:hidden;pointer-events:none`;
+        document.body.appendChild(probe);
+        viewportProbes[unit] = probe;
+      }
+      return viewportProbes[unit].getBoundingClientRect().height;
+    }
+
+    function starfieldCoverSize() {
+      const safe = readSafeAreaInsets();
+      const vv = window.visualViewport;
+      const edge = Math.max(
+        window.innerWidth,
+        window.innerHeight,
+        vv?.width ?? 0,
+        (vv?.height ?? 0) + (vv?.offsetTop ?? 0),
+        document.documentElement.clientWidth,
+        document.documentElement.clientHeight,
+        readViewportUnit("vh"),
+        readViewportUnit("svh"),
+        readViewportUnit("dvh"),
+        readViewportUnit("lvh"),
+        screen.width,
+        screen.height
+      );
+      const pad = Math.max(safe.left + safe.right, safe.top + safe.bottom);
+      return {
+        cover: Math.min(Math.ceil(edge + pad), MAX_STARFIELD_CSS),
+        safe,
+      };
+    }
+
+    function layoutStarfield(canvas) {
+      const { cover, safe } = starfieldCoverSize();
+      if (!cover) return false;
+
+      const size = Math.max(cover, starfieldCover);
+      sky.style.top = `${-safe.top}px`;
+      sky.style.left = `${-safe.left}px`;
+      sky.style.right = "auto";
+      sky.style.bottom = "auto";
+      sky.style.width = `${size}px`;
+      sky.style.height = `${size}px`;
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
+
+      if (size === starfieldCover && starfieldRedPaint === redNight && canvas.width > 0) return true;
+
+      paintStarfield(canvas, size, size);
+      starfieldCover = size;
+      starfieldRedPaint = redNight;
+      return true;
+    }
+
+    function resetStarfieldLayout() {
+      starfieldCover = 0;
+      starfieldRedPaint = null;
+    }
+
+    function applyAstronomerRed(ctx, w, h) {
+      if (!redNight || !w || !h) return;
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const d = imageData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (!d[i + 3]) continue;
+        const lum = 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+        d[i] = lum;
+        d[i + 1] = 0;
+        d[i + 2] = 0;
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
+
+    function paintStarfield(canvas, w, h) {
+      const sf = canvas.getContext("2d");
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const night = redNight;
+
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      sf.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const sky = sf.createRadialGradient(w * 0.38, h * 0.18, 0, w * 0.5, h * 0.55, Math.max(w, h) * 0.95);
+      if (night) {
+        sky.addColorStop(0, "#4a1414");
+        sky.addColorStop(0.45, "#240808");
+        sky.addColorStop(1, "#140404");
+      } else {
+        sky.addColorStop(0, "#121a2f");
+        sky.addColorStop(0.45, "#080c16");
+        sky.addColorStop(1, "#020308");
+      }
+      sf.fillStyle = sky;
+      sf.fillRect(0, 0, w, h);
+
+      let seed = 4187;
+      const rand = () => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+
+      const milky = sf.createLinearGradient(0, h * 0.15, w, h * 0.88);
+      if (night) {
+        milky.addColorStop(0, "rgba(80, 20, 20, 0)");
+        milky.addColorStop(0.38, "rgba(110, 35, 30, 0.05)");
+        milky.addColorStop(0.52, "rgba(140, 45, 38, 0.075)");
+        milky.addColorStop(0.66, "rgba(90, 28, 25, 0.045)");
+        milky.addColorStop(1, "rgba(60, 18, 15, 0)");
+      } else {
+        milky.addColorStop(0, "rgba(70, 90, 150, 0)");
+        milky.addColorStop(0.38, "rgba(95, 115, 175, 0.045)");
+        milky.addColorStop(0.52, "rgba(130, 145, 210, 0.07)");
+        milky.addColorStop(0.66, "rgba(85, 100, 160, 0.04)");
+        milky.addColorStop(1, "rgba(60, 75, 120, 0)");
+      }
+      sf.fillStyle = milky;
+      sf.fillRect(0, 0, w, h);
+
+      const nebulae = night ? [
+        [0.18, 0.28, 0.22, 200, 80, 70],
+        [0.74, 0.22, 0.18, 180, 70, 60],
+        [0.62, 0.78, 0.2, 160, 65, 55],
+        [0.28, 0.72, 0.16, 170, 75, 62],
+      ] : [
+        [0.18, 0.28, 0.22, 120, 180, 255],
+        [0.74, 0.22, 0.18, 180, 120, 220],
+        [0.62, 0.78, 0.2, 100, 140, 210],
+        [0.28, 0.72, 0.16, 140, 160, 230],
+      ];
+      for (const [nx, ny, nr, cr, cg, cb] of nebulae) {
+        const g = sf.createRadialGradient(nx * w, ny * h, 0, nx * w, ny * h, nr * Math.min(w, h));
+        g.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, 0.09)`);
+        g.addColorStop(0.55, `rgba(${cr}, ${cg}, ${cb}, 0.035)`);
+        g.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
+        sf.fillStyle = g;
+        sf.fillRect(0, 0, w, h);
+      }
+
+      function starColor(t) {
+        if (night) {
+          if (t < 0.12) return [255, 130, 110];
+          if (t < 0.22) return [255, 155, 125];
+          if (t < 0.88) return [255, 175, 145];
+          return [255, 195, 165];
+        }
+        if (t < 0.12) return [170, 200, 255];
+        if (t < 0.22) return [220, 230, 255];
+        if (t < 0.88) return [235, 238, 255];
+        return [255, 228, 190];
+      }
+
+      function drawStar(x, y, radius, alpha, color, glow = 0) {
+        if (glow > 0) {
+          const halo = sf.createRadialGradient(x, y, 0, x, y, radius * glow);
+          halo.addColorStop(0, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha * 0.55})`);
+          halo.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`);
+          sf.fillStyle = halo;
+          sf.fillRect(x - radius * glow, y - radius * glow, radius * glow * 2, radius * glow * 2);
+        }
+        sf.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
+        sf.beginPath();
+        sf.arc(x, y, radius, 0, Math.PI * 2);
+        sf.fill();
+      }
+
+      function drawSparkle(x, y, size, alpha, color) {
+        drawStar(x, y, size, alpha, color, 5);
+        sf.strokeStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha * 0.45})`;
+        sf.lineWidth = 0.6;
+        const arm = size * 4.5;
+        sf.beginPath();
+        sf.moveTo(x - arm, y);
+        sf.lineTo(x + arm, y);
+        sf.moveTo(x, y - arm);
+        sf.lineTo(x, y + arm);
+        sf.stroke();
+        const diag = arm * 0.55;
+        sf.lineWidth = 0.35;
+        sf.beginPath();
+        sf.moveTo(x - diag, y - diag);
+        sf.lineTo(x + diag, y + diag);
+        sf.moveTo(x - diag, y + diag);
+        sf.lineTo(x + diag, y - diag);
+        sf.stroke();
+      }
+
+      const area = Math.min(w * h, 1920 * 1080);
+      const dustCount = Math.floor(area / 420);
+      for (let i = 0; i < dustCount; i++) {
+        const x = rand() * w;
+        const y = rand() * h;
+        const bias = Math.abs((x / w + y / h) * 0.5 - 0.48) < 0.18 ? 1.35 : 1;
+        if (rand() > 0.62 * bias) continue;
+        drawStar(x, y, rand() < 0.9 ? 0.45 : 0.7, 0.12 + rand() * 0.38, starColor(rand()));
+      }
+
+      const clusters = Array.from({ length: 7 }, () => ({
+        x: 0.08 + rand() * 0.84,
+        y: 0.08 + rand() * 0.84,
+        spread: 0.03 + rand() * 0.07,
+        count: 18 + (rand() * 30 | 0),
+      }));
+
+      for (const cluster of clusters) {
+        for (let i = 0; i < cluster.count; i++) {
+          const angle = rand() * Math.PI * 2;
+          const dist = rand() * cluster.spread * Math.min(w, h);
+          const x = cluster.x * w + Math.cos(angle) * dist;
+          const y = cluster.y * h + Math.sin(angle) * dist;
+          const color = starColor(rand());
+          drawStar(x, y, 0.55 + rand() * 0.9, 0.25 + rand() * 0.45, color, rand() < 0.2 ? 2.5 : 0);
+        }
+      }
+
+      const midCount = Math.floor(area / 1800);
+      for (let i = 0; i < midCount; i++) {
+        const x = rand() * w;
+        const y = rand() * h;
+        drawStar(x, y, 0.75 + rand() * 0.9, 0.3 + rand() * 0.5, starColor(rand()), rand() < 0.15 ? 2 : 0);
+      }
+
+      const brightCount = Math.floor(area / 12000) + 12;
+      for (let i = 0; i < brightCount; i++) {
+        const x = rand() * w;
+        const y = rand() * h;
+        const color = starColor(rand());
+        const size = 1.1 + rand() * 1.4;
+        if (rand() < 0.28) drawSparkle(x, y, size, 0.55 + rand() * 0.35, color);
+        else drawStar(x, y, size, 0.45 + rand() * 0.4, color, 3.5 + rand() * 2);
+      }
+
+      sf.fillStyle = "rgba(255, 255, 255, 0.012)";
+      const speckCount = Math.min(900, Math.floor(area / 2000));
+      for (let i = 0; i < speckCount; i++) {
+        sf.fillRect(rand() * w, rand() * h, 1, 1);
+      }
+    }
+
+    function drawMoon(phase, illum) {
+      if (!textureReady) return;
+
+      lastPhase = phase;
+      lastIllum = illum;
+
+      const w = canvas.width;
+      const h = canvas.height;
+      if (!w || !h) return;
+      const cx = w / 2;
+      const cy = h / 2;
+      const r = Math.min(w, h) / 2;
+      const side = textureCanvas.width;
+
+      ctx.clearRect(0, 0, w, h);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.clip();
+      const dest = Math.round(r * 2);
+      const downscale = dest < side - 1;
+      ctx.imageSmoothingEnabled = downscale;
+      if (downscale && "imageSmoothingQuality" in ctx) {
+        ctx.imageSmoothingQuality = "high";
+      }
+      ctx.drawImage(textureCanvas, 0, 0, side, side, cx - r, cy - r, dest, dest);
+      ctx.imageSmoothingEnabled = true;
+      ctx.restore();
+
+      darkenUnlit(cx, cy, r, phase, illum, 1 - EARTHSHINE);
+
+      if (!limbGradient) {
+        limbGradient = ctx.createRadialGradient(cx, cy, r * 0.86, cx, cy, r);
+        limbGradient.addColorStop(0, "rgba(0, 0, 0, 0)");
+        limbGradient.addColorStop(1, "rgba(0, 0, 0, 0.06)");
+      }
+
+      ctx.save();
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.fillStyle = limbGradient;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      ctx.restore();
+
+      brightenLit(cx, cy, r, phase, illum);
+      applyAstronomerRed(ctx, w, h);
+    }
+
+    function updateMoonUI(date, phase, illum) {
+      ui.phaseName.textContent = phaseName(phase);
+      lastDistanceKm = moonDistanceKm(date);
+      const distanceLabel = distanceUseKm ? 'kilometers' : 'miles';
+      ui.meta.innerHTML =
+        `<span class="meta-top">` +
+          `<span class="meta-date">${formatDate(date)}</span>` +
+          `<button type="button" class="distance-toggle" id="moon-distance-toggle" aria-label="Moon distance in ${distanceLabel}, tap to switch units">${formatMoonDistance(lastDistanceKm)}</button>` +
+        `</span>` +
+        `<span class="meta-detail">${(illum * 100).toFixed(1)}% illuminated · day ${(phase * SYNODIC).toFixed(1)} of ${SYNODIC.toFixed(1)}</span>`;
+      bindDistanceToggle();
+    }
+
+    function previewPhase() {
+      return previewMode ? Number(ui.slider.value) / 1000 : null;
+    }
+
+    function render(date, phaseOverride = previewPhase()) {
+      const data = moonData(date);
+      const phase = phaseOverride ?? data.phase;
+      const illum = phaseOverride != null ? phaseIllum(phase) : data.fraction;
+      if (textureReady) drawMoon(phase, illum);
+      updateMoonUI(date, phase, illum);
+    }
+
+    function updateLiveButton() {
+      ui.reset.textContent = previewMode ? "Use live" : "Live";
+      ui.reset.classList.toggle("is-preview", previewMode);
+      ui.reset.classList.toggle("is-live", !previewMode);
+    }
+
+    function setToday() {
+      const now = new Date();
+      currentDate = now;
+      previewMode = false;
+      ui.slider.value = Math.round(moonData(now).phase * 1000);
+      ui.sliderLabel.textContent = "Live phase";
+      updateLiveButton();
+      render(now);
+    }
+
+    function ensureSliderAnchor() {
+      if (!sliderAnchorDate) {
+        sliderAnchorDate = currentDate;
+        sliderAnchorPhase = previewMode
+          ? Number(ui.slider.value) / 1000
+          : moonData(currentDate).phase;
+      }
+    }
+
+    function bakeTexture(img) {
+      const size = Math.min(TEXTURE_SIZE, img.naturalWidth, img.naturalHeight);
+      const sameSize = img.naturalWidth === size && img.naturalHeight === size;
+      textureCanvas.width = textureCanvas.height = size;
+      textureCtx.clearRect(0, 0, size, size);
+      textureCtx.imageSmoothingEnabled = !sameSize;
+      if (!sameSize && "imageSmoothingQuality" in textureCtx) {
+        textureCtx.imageSmoothingQuality = "high";
+      }
+      if (sameSize) {
+        textureCtx.drawImage(img, 0, 0);
+      } else {
+        textureCtx.drawImage(img, 0, 0, size, size);
+      }
+      textureCtx.imageSmoothingEnabled = true;
+      textureReady = true;
+    }
+
+    function queuePreview(phase, date) {
+      pendingPreviewPhase = phase;
+      pendingPreviewDate = date;
+      if (sliderRaf) return;
+      sliderRaf = requestAnimationFrame(() => {
+        sliderRaf = 0;
+        if (pendingPreviewPhase == null) return;
+        const previewPhase = pendingPreviewPhase;
+        const previewDate = pendingPreviewDate;
+        pendingPreviewPhase = null;
+        pendingPreviewDate = null;
+        drawMoon(previewPhase, phaseIllum(previewPhase));
+        if (previewDate) updateMoonUI(previewDate, previewPhase, phaseIllum(previewPhase));
+      });
+    }
+
+    async function loadTexture() {
+      ui.meta.textContent = "Loading moon image…";
+      try {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = () => img.naturalWidth ? resolve() : reject(new Error("empty image"));
+          img.onerror = () => reject(new Error("failed to load moon.jpg"));
+          img.src = MOON_SRC;
+        });
+        if (img.decode) await img.decode();
+        bakeTexture(img);
+        resizeRenderCanvas();
+        ui.wrap.classList.remove("is-loading");
+        setToday();
+        fit.scheduleFitToScreen(true);
+      } catch (error) {
+        ui.wrap.classList.remove("is-loading");
+        ui.meta.textContent = `Could not load moon image: ${error.message}`;
+        fit.scheduleFitToScreen(true);
+      }
+    }
+
+    function setHemisphere(isNorth) {
+      northern = isNorth;
+      ui.hemNorth.classList.toggle("active", isNorth);
+      ui.hemSouth.classList.toggle("active", !isNorth);
+      ui.subtitle.textContent = isNorth ? "Northern Hemisphere" : "Southern Hemisphere";
+      if (textureReady) render(currentDate);
+    }
+
+    ui.slider.addEventListener("pointerdown", ensureSliderAnchor);
+    ui.slider.addEventListener("pointerup", () => { sliderAnchorDate = null; });
+    ui.slider.addEventListener("pointercancel", () => { sliderAnchorDate = null; });
+
+    ui.slider.addEventListener("input", () => {
+      ensureSliderAnchor();
+      previewMode = true;
+      const phase = Number(ui.slider.value) / 1000;
+      const date = dateFromPhaseOffset(sliderAnchorDate, sliderAnchorPhase, phase);
+      currentDate = date;
+      ui.sliderLabel.textContent = `Preview ${(phase * 100).toFixed(1)}% through cycle`;
+      updateLiveButton();
+      queuePreview(phase, date);
+    });
+
+    ui.reset.addEventListener("click", setToday);
+    ui.hemNorth.addEventListener("click", () => setHemisphere(true));
+    ui.hemSouth.addEventListener("click", () => setHemisphere(false));
+
+    let starfieldTimer = 0;
+    function runStarfieldLayout() {
+      requestAnimationFrame(() => {
+        if (!layoutStarfield(starfield)) starfieldTimer = setTimeout(runStarfieldLayout, 120);
+      });
+    }
+
+    function scheduleStarfield() {
+      clearTimeout(starfieldTimer);
+      starfieldTimer = setTimeout(runStarfieldLayout, 100);
+    }
+
+    function refreshStarfield() {
+      resetStarfieldLayout();
+      STARFIELD_BOOT_MS.forEach((ms) => setTimeout(runStarfieldLayout, ms));
+      runStarfieldLayout();
+    }
+
+    function scheduleMoonResize() {
+      requestAnimationFrame(() => {
+        resizeRenderCanvas();
+        if (textureReady) drawMoon(lastPhase, lastIllum);
+      });
+    }
+
+    let layoutFrozen = false;
+
+    function freezePageLayout() {
+      if (layoutFrozen || !ui.slot) return;
+      layoutFrozen = true;
+      if (ui.slot.offsetWidth > 0) {
+        ui.slot.style.width = `${ui.slot.offsetWidth}px`;
+        ui.slot.style.height = `${ui.slot.offsetHeight}px`;
+      }
+    }
+
+    function unfreezePageLayout() {
+      if (!layoutFrozen || !ui.slot) return;
+      layoutFrozen = false;
+      ui.slot.style.width = "";
+      ui.slot.style.height = "";
+    }
+
+    function restoreLayoutAfterZoom() {
+      fit.resetNaturalSize();
+      scheduleMoonResize();
+      fit.scheduleFitToScreen(true);
+      if (textureReady) render(currentDate);
+    }
+
+    const fit = FitToScreen.create({
+      wideAppWidth: 480,
+      shouldFit: () => {
+        if (document.body.classList.contains("moon-zoomed")) return false;
+        if (moonZoom > ZOOM_EPS) return false;
+        if (isLivePinch()) return false;
+        return true;
+      },
+    });
+
+    function onViewportChange() {
+      if (isLivePinch()) return;
+      scheduleStarfield();
+      if (!layoutFrozen) scheduleMoonResize();
+      if (moonZoom <= ZOOM_EPS) fit.scheduleFitToScreen(true);
+    }
+
+    function onOrientationChange() {
+      refreshStarfield();
+      if (moonZoom > ZOOM_EPS) {
+        moonPan = { x: 0, y: 0 };
+        moonHomeOrigin = null;
+        [150, 350].forEach((ms) => setTimeout(() => applyMoonZoom(true), ms));
+      }
+      if (!layoutFrozen) scheduleMoonResize();
+      [150, 350, 600].forEach((ms) => setTimeout(onViewportChange, ms));
+    }
+
+    refreshStarfield();
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("orientationchange", onOrientationChange);
+    window.visualViewport?.addEventListener("resize", onViewportChange);
+    window.visualViewport?.addEventListener("scroll", onViewportChange);
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted) ensureNormalOnOpen();
+      refreshStarfield();
+      onViewportChange();
+    });
+
+    let pinchStartDist = 0;
+    let pinchStartZoom = 1;
+    let pinchStartGestureZoom = 1;
+    let pinching = false;
+    let gesturing = false;
+    let panning = false;
+    let panPointerId = null;
+    let panStart = { x: 0, y: 0, panX: 0, panY: 0 };
+    let moonPan = { x: 0, y: 0 };
+    let moonHomeOrigin = null;
+
+    function touchSpan(touches) {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.hypot(dx, dy);
+    }
+
+    function isLivePinch() {
+      return pinching || gesturing || panning;
+    }
+
+    function layoutAnchorFromRect(rect) {
+      const vv = window.visualViewport;
+      return {
+        cx: rect.left + rect.width / 2 + (vv?.offsetLeft ?? 0),
+        cy: rect.top + rect.height / 2 + (vv?.offsetTop ?? 0),
+      };
+    }
+
+    function captureMoonHome() {
+      if (moonHomeOrigin || !ui.wrap) return;
+      moonHomeOrigin = layoutAnchorFromRect(ui.wrap.getBoundingClientRect());
+    }
+
+    function moonPanLimit() {
+      const base = moonBaseSize > 0 ? moonBaseSize : moonCssSize();
+      const fitScale = moonZoom > ZOOM_EPS ? readAppFitScale() : 1;
+      return base * fitScale * Math.max(0, moonZoom - 1) / 2;
+    }
+
+    function clampMoonPan(x, y) {
+      const limit = moonPanLimit();
+      return {
+        x: Math.max(-limit, Math.min(limit, x)),
+        y: Math.max(-limit, Math.min(limit, y)),
+      };
+    }
+
+    function getMoonCenter() {
+      if (!moonHomeOrigin) captureMoonHome();
+      if (!moonHomeOrigin) return { cx: 0, cy: 0 };
+      const clamped = clampMoonPan(moonPan.x, moonPan.y);
+      moonPan.x = clamped.x;
+      moonPan.y = clamped.y;
+      return {
+        cx: moonHomeOrigin.cx + moonPan.x,
+        cy: moonHomeOrigin.cy + moonPan.y,
+      };
+    }
+
+    function syncZoomAnchorFromView() {
+      if (!moonHomeOrigin) captureMoonHome();
+      if (!moonHomeOrigin) return;
+      const current = layoutAnchorFromRect(ui.wrap.getBoundingClientRect());
+      moonPan.x = current.cx - moonHomeOrigin.cx;
+      moonPan.y = current.cy - moonHomeOrigin.cy;
+      const clamped = clampMoonPan(moonPan.x, moonPan.y);
+      moonPan.x = clamped.x;
+      moonPan.y = clamped.y;
+    }
+
+    function captureMoonZoomOrigin() {
+      if (!(moonZoom > ZOOM_EPS && moonBaseSize > 0)) {
+        const layoutW = ui.slot?.offsetWidth || ui.wrap.offsetWidth;
+        moonBaseSize = moonZoom > ZOOM_EPS && layoutW > 0
+          ? layoutW / moonZoom
+          : moonCssSize();
+      }
+      captureMoonHome();
+    }
+
+    function stopPanning() {
+      if (!panning) return;
+      const id = panPointerId;
+      panning = false;
+      panPointerId = null;
+      ui.wrap.classList.remove("is-panning");
+      if (id != null) {
+        try { ui.wrap.releasePointerCapture(id); } catch (_) {}
+      }
+    }
+
+    function ensureMoonZoomPortal() {
+      if (!ui.wrap || ui.wrap.parentElement === document.body) return;
+      document.body.appendChild(ui.wrap);
+    }
+
+    function releaseMoonZoomPortal() {
+      if (!ui.wrap || !ui.slot || ui.wrap.parentElement === ui.slot) return;
+      ui.slot.appendChild(ui.wrap);
+    }
+
+    function setWrapZoomLayout(cx, cy, size, transform) {
+      ensureMoonZoomPortal();
+      ui.wrap.style.position = "fixed";
+      ui.wrap.style.left = `${cx}px`;
+      ui.wrap.style.top = `${cy}px`;
+      ui.wrap.style.width = `${size}px`;
+      ui.wrap.style.height = `${size}px`;
+      ui.wrap.style.margin = "0";
+      ui.wrap.style.transform = transform;
+    }
+
+    function clearZoomLayout() {
+      const needsRestore =
+        document.body.classList.contains("moon-zoomed") ||
+        ui.wrap.classList.contains("is-zoomed") ||
+        ui.wrap.parentElement === document.body;
+      moonPan = { x: 0, y: 0 };
+      moonHomeOrigin = null;
+      moonBaseSize = 0;
+      stopPanning();
+      ui.wrap.classList.remove("is-zoomed");
+      ui.wrap.style.position = "";
+      ui.wrap.style.left = "";
+      ui.wrap.style.top = "";
+      ui.wrap.style.width = "";
+      ui.wrap.style.height = "";
+      ui.wrap.style.margin = "";
+      ui.wrap.style.transform = "";
+      releaseMoonZoomPortal();
+      document.body.classList.remove("moon-zoomed");
+      unfreezePageLayout();
+      if (needsRestore) restoreLayoutAfterZoom();
+    }
+
+    function repaintMoonNow(force = false) {
+      if (zoomRaf) {
+        cancelAnimationFrame(zoomRaf);
+        zoomRaf = 0;
+      }
+      if (moonZoom <= ZOOM_EPS) moonBaseSize = 0;
+      resizeRenderCanvas(force);
+      if (textureReady) drawMoon(lastPhase, lastIllum);
+    }
+
+    function scheduleMoonRepaint() {
+      if (zoomRaf) cancelAnimationFrame(zoomRaf);
+      zoomRaf = requestAnimationFrame(() => {
+        zoomRaf = 0;
+        repaintMoonNow(!isLivePinch());
+      });
+    }
+
+    function applyMoonZoom(repaint = true) {
+      const zoomed = moonZoom > ZOOM_EPS;
+      ui.wrap.classList.toggle("is-zoomed", zoomed);
+      document.body.classList.toggle("moon-zoomed", zoomed);
+
+      if (!zoomed) {
+        clearZoomLayout();
+        if (!pinching && !gesturing && repaint) scheduleMoonRepaint();
+        return;
+      }
+
+      freezePageLayout();
+      captureMoonZoomOrigin();
+      if (!moonHomeOrigin) return;
+
+      const base = moonBaseSize;
+      const fitScale = readAppFitScale();
+      const { cx, cy } = getMoonCenter();
+
+      if (pinching || gesturing) {
+        setWrapZoomLayout(cx, cy, base * fitScale, `translate(-50%, -50%) scale(${moonZoom})`);
+        return;
+      }
+
+      setWrapZoomLayout(cx, cy, base * moonZoom * fitScale, "translate(-50%, -50%)");
+      if (repaint) scheduleMoonRepaint();
+    }
+
+    function finishZoomGesture() {
+      if (moonZoom > ZOOM_EPS) syncZoomAnchorFromView();
+      applyMoonZoom();
+      repaintMoonNow(true);
+      if (moonZoom > ZOOM_EPS) {
+        requestAnimationFrame(() => requestAnimationFrame(() => repaintMoonNow(true)));
+      }
+    }
+
+    document.addEventListener("touchstart", (event) => {
+      if (event.touches.length === 2) {
+        stopPanning();
+        pinching = true;
+        freezePageLayout();
+        if (moonZoom <= ZOOM_EPS) moonHomeOrigin = null;
+        pinchStartDist = touchSpan(event.touches);
+        pinchStartZoom = moonZoom;
+        captureMoonZoomOrigin();
+      }
+    }, { passive: true });
+
+    document.addEventListener("touchmove", (event) => {
+      if (!pinching || event.touches.length !== 2) return;
+      event.preventDefault();
+      const span = touchSpan(event.touches);
+      if (!pinchStartDist) return;
+      moonZoom = Math.min(MAX_MOON_ZOOM, Math.max(MIN_MOON_ZOOM, pinchStartZoom * (span / pinchStartDist)));
+      applyMoonZoom();
+    }, { passive: false });
+
+    document.addEventListener("touchend", (event) => {
+      if (event.touches.length < 2) {
+        const wasPinching = pinching;
+        pinching = false;
+        pinchStartDist = 0;
+        if (wasPinching) {
+          finishZoomGesture();
+          if (moonZoom <= ZOOM_EPS) unfreezePageLayout();
+        }
+      }
+    }, { passive: true });
+
+    document.addEventListener("gesturestart", (event) => {
+      if (pinching) return;
+      event.preventDefault();
+      stopPanning();
+      gesturing = true;
+      freezePageLayout();
+      if (moonZoom <= ZOOM_EPS) moonHomeOrigin = null;
+      pinchStartGestureZoom = moonZoom;
+      captureMoonZoomOrigin();
+    }, { passive: false });
+    document.addEventListener("gesturechange", (event) => {
+      if (pinching) return;
+      event.preventDefault();
+      moonZoom = Math.min(
+        MAX_MOON_ZOOM,
+        Math.max(MIN_MOON_ZOOM, pinchStartGestureZoom * event.scale)
+      );
+      applyMoonZoom();
+    }, { passive: false });
+    document.addEventListener("gestureend", (event) => {
+      event.preventDefault();
+      gesturing = false;
+      finishZoomGesture();
+      if (moonZoom <= ZOOM_EPS) unfreezePageLayout();
+    }, { passive: false });
+
+    document.addEventListener("wheel", (event) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      freezePageLayout();
+      captureMoonZoomOrigin();
+      moonZoom = Math.min(
+        MAX_MOON_ZOOM,
+        Math.max(MIN_MOON_ZOOM, moonZoom - event.deltaY * 0.012)
+      );
+      applyMoonZoom();
+    }, { passive: false });
+
+    function ensureNormalOnOpen() {
+      if (!redNight && !document.documentElement.classList.contains("red-night")) return;
+      setRedNight(false);
+    }
+
+    function setRedNight(on) {
+      redNight = on;
+      document.documentElement.classList.toggle("red-night", on);
+      const theme = document.querySelector('meta[name="theme-color"]');
+      if (theme) theme.content = on ? THEME_RED : THEME_NORMAL;
+      limbGradient = null;
+      litLiftGradient = null;
+      refreshStarfield();
+      if (textureReady) drawMoon(lastPhase, lastIllum);
+    }
+
+    function beginMoonTap(event) {
+      if (pinching || gesturing) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      moonTap = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+    }
+
+    function trackMoonTap(event) {
+      if (!moonTap || moonTap.id !== event.pointerId || moonTap.moved) return;
+      const dx = event.clientX - moonTap.x;
+      const dy = event.clientY - moonTap.y;
+      if (dx * dx + dy * dy > MOON_TAP_SLOP * MOON_TAP_SLOP) moonTap.moved = true;
+    }
+
+    function finishMoonTap(event) {
+      if (!moonTap || moonTap.id !== event.pointerId) return;
+      const shouldToggle = !moonTap.moved && !pinching && !gesturing;
+      moonTap = null;
+      if (shouldToggle) setRedNight(!redNight);
+    }
+
+    ui.wrap.addEventListener("pointerdown", (event) => {
+      beginMoonTap(event);
+      if (moonZoom <= ZOOM_EPS || pinching || gesturing) return;
+      if (event.pointerType === "mouse" && event.button !== 0) return;
+      panning = true;
+      panPointerId = event.pointerId;
+      panStart = {
+        x: event.clientX,
+        y: event.clientY,
+        panX: moonPan.x,
+        panY: moonPan.y,
+      };
+      ui.wrap.classList.add("is-panning");
+      ui.wrap.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    });
+
+    ui.wrap.addEventListener("pointermove", (event) => {
+      trackMoonTap(event);
+      if (!panning || event.pointerId !== panPointerId) return;
+      moonPan.x = panStart.panX + (event.clientX - panStart.x);
+      moonPan.y = panStart.panY + (event.clientY - panStart.y);
+      applyMoonZoom(false);
+      event.preventDefault();
+    });
+
+    ui.wrap.addEventListener("pointerup", (event) => {
+      finishMoonTap(event);
+      if (!panning || event.pointerId !== panPointerId) return;
+      stopPanning();
+    });
+
+    ui.wrap.addEventListener("pointercancel", (event) => {
+      if (moonTap?.id === event.pointerId) moonTap = null;
+      if (!panning || event.pointerId !== panPointerId) return;
+      stopPanning();
+    });
+
+    function boot() {
+      ensureNormalOnOpen();
+      resizeRenderCanvas();
+      loadTexture();
+      fit.bootLayout();
+    }
+
+    if (document.readyState === "complete") {
+      requestAnimationFrame(boot);
+    } else {
+      window.addEventListener("load", () => requestAnimationFrame(boot), { once: true });
+    }
+  </script>
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
