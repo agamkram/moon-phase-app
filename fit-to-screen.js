@@ -26,6 +26,8 @@
       capScaleAtOne = true,
       shouldFit = () => true,
       getTopBuffer,
+      /** When false, fill the stage with flex layout — no scale() packing. */
+      useScaleForLayout = () => true,
       onFit = () => {},
     } = options || {};
 
@@ -81,6 +83,27 @@
       return stage.clientHeight === fitAvailH && stage.clientWidth === fitAvailW;
     }
 
+    function applyFluidLayout(layout, availH, availW) {
+      stage.classList.add("fit-stage--fluid");
+      app.dataset.layout = layout;
+      app.style.width = "";
+      app.style.maxWidth = "";
+      app.style.height = "";
+      app.style.transform = "none";
+      fitLayout = layout;
+      fitAvailH = availH;
+      fitAvailW = availW;
+      appliedScale = 1;
+      fitNaturalH = 0;
+      fitNaturalW = 0;
+      if (!app.classList.contains("is-fitted")) {
+        layoutShownAt = performance.now();
+      }
+      app.classList.add("is-fitted");
+      layoutReady = true;
+      onFit({ scale: 1, layout, availH, availW, fluid: true });
+    }
+
     function fitToScreen(remasure = false) {
       if (!ensureElements() || !shouldFit()) return;
 
@@ -91,7 +114,27 @@
       const viewportChanged = availH !== fitAvailH || availW !== fitAvailW;
       const layout = isPhoneLayout(availW) ? "phone" : "wide";
       const layoutChanged = layout !== fitLayout;
+      const wantScale =
+        typeof useScaleForLayout === "function"
+          ? useScaleForLayout(layout, availW, availH)
+          : !!useScaleForLayout;
 
+      if (!wantScale) {
+        if (
+          layoutReady &&
+          app.classList.contains("is-fitted") &&
+          layout === fitLayout &&
+          stage.classList.contains("fit-stage--fluid") &&
+          !viewportChanged &&
+          !remasure
+        ) {
+          return;
+        }
+        applyFluidLayout(layout, availH, availW);
+        return;
+      }
+
+      stage.classList.remove("fit-stage--fluid");
       app.style.width = `${appLayoutWidth(availW)}px`;
       app.dataset.layout = layout;
 

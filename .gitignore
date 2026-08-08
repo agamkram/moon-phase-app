@@ -2,3 +2,6 @@
 .npm-cache
 .tmp
 .vercel
+
+.local-cert.pem
+.local-key.pem

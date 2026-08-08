@@ -55,27 +55,41 @@
       font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
     }
 
+    /*
+     * Shell layout (no scale packing):
+     *  fixed title chrome
+     *  stage fills leftover height
+     *  moon centered in free band (equal spacers)
+     *  phase + control card docked at bottom
+     * Works the same on Mac / iPad / phone / PWA — no inch-by-inch tweaks.
+     */
     .fit-stage {
       position: fixed;
       inset: 0;
       overflow: hidden;
       display: flex;
-      align-items: center;
+      align-items: stretch;
       justify-content: center;
       padding:
-        max(0.35rem, env(safe-area-inset-top))
-        max(0.5rem, env(safe-area-inset-right))
-        max(0.35rem, env(safe-area-inset-bottom))
-        max(0.5rem, env(safe-area-inset-left));
+        calc(env(safe-area-inset-top, 0px) + 3.15rem)
+        max(0.5rem, env(safe-area-inset-right, 0px))
+        max(0.55rem, env(safe-area-inset-bottom, 0px))
+        max(0.5rem, env(safe-area-inset-left, 0px));
     }
 
+    .fit-stage--fluid .app,
     .app {
       position: relative;
-      flex-shrink: 0;
       box-sizing: border-box;
-      transform: scale(1);
-      transform-origin: center center;
-      will-change: transform;
+      width: 100%;
+      max-width: var(--app-max, 28rem);
+      height: 100%;
+      margin: 0 auto;
+      transform: none;
+      display: flex;
+      flex-direction: column;
+      text-align: center;
+      padding: 0.15rem 0.75rem 0.25rem;
     }
 
     .app:not(.is-fitted) {
@@ -104,48 +118,83 @@
       vertical-align: top;
     }
 
-    main.app {
-      z-index: 1;
+    /* Fixed top chrome — not scaled with the fit-stage (matches SuperMoon / CalamityVille) */
+    .app-chrome {
+      position: fixed;
+      z-index: 4;
+      left: 0;
+      right: 0;
+      top: 0;
+      padding:
+        max(0.45rem, env(safe-area-inset-top, 0px))
+        max(1rem, env(safe-area-inset-right, 0px))
+        0.25rem
+        max(1rem, env(safe-area-inset-left, 0px));
       text-align: center;
-      padding: 1.25rem 1rem;
+      pointer-events: none;
     }
 
-    h1 {
-      margin: 0 0 0.35rem;
+    .app-chrome h1 {
+      margin: 0 0 0.15rem;
       font-size: 1.65rem;
       font-weight: 500;
       letter-spacing: 0.04em;
+      line-height: 1.15;
+      text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45);
     }
 
-    .subtitle { margin: 0 0 1.75rem; color: var(--muted); font-size: 0.95rem; }
+    .app-chrome .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.2;
+      text-shadow: 0 1px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    main.app {
+      z-index: 1;
+    }
+
+    /* Equal air above moon (under title) and below moon (above phase/card) */
+    .moon-balance {
+      flex: 1 1 0;
+      min-height: 0;
+      pointer-events: none;
+    }
 
     .moon-slot {
-      width: 400px;
+      /* Set by applyOpenMoonSize() — CSS fallback = Mac */
+      width: var(--moon-open-size, min(100%, 42vmin, 20rem));
       max-width: 100%;
-      margin: 0 auto 1.5rem;
+      margin: 0 auto;
       aspect-ratio: 1;
       flex-shrink: 0;
       overflow: visible;
     }
 
+    .lower-stack {
+      flex-shrink: 0;
+    }
+
+    .meta { margin-bottom: 0.35rem; }
+
     @media (max-width: 767px) {
+      .app-chrome h1 {
+        font-size: 1.35rem;
+      }
+
+      .app-chrome .subtitle {
+        font-size: 0.85rem;
+      }
+
+      .controls { padding: 0.4rem 0.5rem; }
+    }
+
+    @media (min-width: 768px) {
       .fit-stage {
-        padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
-        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+        padding-left: max(1rem, env(safe-area-inset-left, 0px));
+        padding-right: max(1rem, env(safe-area-inset-right, 0px));
       }
-
-      main.app {
-        padding: 1rem 0.75rem;
-      }
-
-      .moon-slot {
-        width: min(100%, 340px);
-        margin-bottom: 1rem;
-      }
-
-      .subtitle { margin-bottom: 1rem; }
-      .meta { margin-bottom: 1rem; }
-      .controls { padding: 0.85rem 0.95rem; }
     }
 
     .moon-wrap {
@@ -199,7 +248,7 @@
 
     .phase-name { font-size: 1.35rem; margin: 0 0 0.35rem; }
     .meta {
-      margin: 0 0 1.75rem;
+      margin: 0 0 0.4rem;
       color: var(--muted);
       font-size: 0.92rem;
       line-height: 1.45;
@@ -239,39 +288,40 @@
 
     .controls {
       display: grid;
-      gap: 0.85rem;
+      gap: 0.32rem;
       text-align: left;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 14px;
-      padding: 1rem 1.1rem;
+      border-radius: 8px;
+      padding: 0.42rem 0.5rem;
     }
 
     label {
       display: grid;
-      gap: 0.45rem;
-      font-size: 0.82rem;
+      gap: 0.18rem;
+      font-size: 0.65rem;
       color: var(--muted);
       letter-spacing: 0.03em;
       text-transform: uppercase;
     }
 
-    .row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
-    .slider-label { color: var(--muted); font-size: 0.85rem; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+    .slider-label { color: var(--muted); font-size: 0.68rem; }
 
     button {
       border: 1px solid rgba(255, 255, 255, 0.12);
       background: rgba(255, 255, 255, 0.05);
       color: var(--text);
-      border-radius: 8px;
-      padding: 0.45rem 0.8rem;
+      border-radius: 5px;
+      padding: 0.24rem 0.48rem;
       font: inherit;
+      font-size: 0.8rem;
       cursor: pointer;
     }
 
     button:hover { background: rgba(255, 255, 255, 0.09); }
 
-    .toggle-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .toggle-group { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; }
 
     .toggle-group button.active {
       background: rgba(255, 255, 255, 0.12);
@@ -280,8 +330,8 @@
 
     .live-btn {
       border-radius: 999px;
-      padding: 0.35rem 0.75rem;
-      font-size: 0.82rem;
+      padding: 0.22rem 0.55rem;
+      font-size: 0.72rem;
       border: 1px solid transparent;
       transition: background 0.15s, border-color 0.15s, color 0.15s;
     }
@@ -347,19 +397,20 @@
     }
 
     html.red-night .red-surface,
+    html.red-night .app-chrome,
     html.red-night .slider-panel {
       -webkit-filter: url(#astronomer-red);
       filter: url(#astronomer-red);
     }
 
     .slider-panel {
-      padding: 0.85rem 0 0.35rem;
+      padding: 0.28rem 0 0.08rem;
     }
 
     #phase-slider {
       display: block;
       width: 100%;
-      min-height: 48px;
+      min-height: 28px;
       margin: 0;
       cursor: pointer;
       accent-color: var(--accent);
@@ -397,12 +448,14 @@
     })();
   </script>
 
+  <header class="app-chrome red-surface">
+    <h1>Today's Moon</h1>
+    <p class="subtitle" id="subtitle">Northern Hemisphere</p>
+  </header>
+
   <div class="fit-stage" id="fit-stage">
   <main class="app" id="app">
-    <div class="red-surface">
-      <h1>Today's Moon</h1>
-      <p class="subtitle" id="subtitle">Northern Hemisphere</p>
-    </div>
+    <div class="moon-balance" aria-hidden="true"></div>
 
     <div class="moon-slot">
       <div class="moon-wrap is-loading" id="moon-wrap">
@@ -410,31 +463,35 @@
       </div>
     </div>
 
-    <div class="red-surface">
-      <p class="phase-name" id="phase-name">—</p>
-      <p class="meta" id="meta">—</p>
-    </div>
+    <div class="moon-balance" aria-hidden="true"></div>
 
-    <div class="controls">
+    <div class="lower-stack">
       <div class="red-surface">
-        <label>
-          Hemisphere
-          <div class="toggle-group">
-            <button type="button" id="hem-north" class="active">Northern</button>
-            <button type="button" id="hem-south">Southern</button>
-          </div>
-        </label>
+        <p class="phase-name" id="phase-name">—</p>
+        <p class="meta" id="meta">—</p>
       </div>
 
-      <div class="slider-panel">
-        <label>
-          Preview phase
-          <input type="range" id="phase-slider" min="0" max="1000" value="0" step="1" />
-        </label>
+      <div class="controls">
+        <div class="red-surface">
+          <label>
+            Hemisphere
+            <div class="toggle-group">
+              <button type="button" id="hem-north" class="active">Northern</button>
+              <button type="button" id="hem-south">Southern</button>
+            </div>
+          </label>
+        </div>
 
-        <div class="row">
-          <span id="slider-label" class="slider-label">Live phase</span>
-          <button type="button" id="reset" class="live-btn is-live">Live</button>
+        <div class="slider-panel">
+          <label>
+            Preview phase
+            <input type="range" id="phase-slider" min="0" max="1000" value="0" step="1" />
+          </label>
+
+          <div class="row">
+            <span id="slider-label" class="slider-label">Live phase</span>
+            <button type="button" id="reset" class="live-btn is-live">Live</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1200,19 +1257,62 @@
       if (textureReady) render(currentDate);
     }
 
+    /**
+     * Open moon size by device — not pointer:coarse (iPad often reports fine).
+     * Mac: no touch. Phone: touch + short side. iPad: touch + larger.
+     */
+    function applyOpenMoonSize() {
+      if (layoutFrozen || moonZoom > ZOOM_EPS) return;
+      const root = document.documentElement;
+      const touch = (navigator.maxTouchPoints || 0) > 0;
+      const iw = window.innerWidth || 1;
+      const ih = window.innerHeight || 1;
+      const minSide = Math.min(iw, ih);
+      const stage = document.getElementById("fit-stage");
+      const sw = Math.max(1, stage?.clientWidth || iw);
+      const sh = Math.max(1, stage?.clientHeight || ih);
+
+      if (!touch) {
+        root.dataset.shell = "mac";
+        root.style.setProperty("--app-max", "28rem");
+        root.style.setProperty("--moon-open-size", "min(100%, 42vmin, 20rem)");
+        return;
+      }
+
+      if (minSide <= 500) {
+        root.dataset.shell = "phone";
+        root.style.setProperty("--app-max", "28rem");
+        root.style.setProperty("--moon-open-size", "min(100%, 84vmin, 28rem)");
+        return;
+      }
+
+      /* iPad / large touch: size from stage so it actually lands larger and stays */
+      root.dataset.shell = "ipad";
+      root.style.setProperty("--app-max", "min(100%, 56rem)");
+      const px = Math.round(Math.min(sw * 0.9, sh * 0.68, Math.min(sw, sh) * 0.92));
+      root.style.setProperty("--moon-open-size", Math.max(320, px) + "px");
+    }
+
     const fit = FitToScreen.create({
       wideAppWidth: 480,
+      /* Fluid shell: title / moon / card positions come from flex, not scale() */
+      useScaleForLayout: () => false,
       shouldFit: () => {
         if (document.body.classList.contains("moon-zoomed")) return false;
         if (moonZoom > ZOOM_EPS) return false;
         if (isLivePinch()) return false;
         return true;
       },
+      onFit: () => {
+        applyOpenMoonSize();
+        if (!layoutFrozen) scheduleMoonResize();
+      },
     });
 
     function onViewportChange() {
       if (isLivePinch()) return;
       scheduleStarfield();
+      applyOpenMoonSize();
       if (!layoutFrozen) scheduleMoonResize();
       if (moonZoom <= ZOOM_EPS) fit.scheduleFitToScreen(true);
     }
